@@ -7,15 +7,7 @@ Le code récupéré est intégré dans `apps/missions, apps/specifications, pack
 
 ## Installer et vérifier
 
-Cette branche utilise une composition locale de dépôts voisins : `project-governance`, `schemas-and-contracts`, `application-development-toolkit`, `organization-data-lifecycle` et, selon le consommateur, `ai-model-policy`. Les dépendances `file:` et leurs overrides racine sont relatifs ; aucun chemin personnel n’est requis. Construire d’abord le paquet UI dans le toolkit afin que ses exports navigateur soient présents. Les workspaces partagent leurs versions de React ; ne pas lancer une installation indépendante à l’intérieur d’une application.
-
-Depuis la racine du dépôt, avec Bun 1.4.0-canary.1 (révision57f349f63) :
-
-```sh
-bun install --ignore-scripts
-bun install --frozen-lockfile --ignore-scripts
-bun run check
-```
+Utilisez le [guide commun de composition locale](https://github.com/libre-ai/project-governance/blob/main/docs/LOCAL-COMPOSITION.md) avec la cible `ai-work-supervision` et le SHA du commit à vérifier. Il prépare les voisins épinglés, installe les workspaces dans l’ordre et construit UI avant les consommateurs. Après cette préparation, exécutez les commandes propres à cette application depuis sa racine dans la composition.
 
 L’installation est une étape explicite ; `check` ne télécharge plus de dépendances. Les contrôles Bun, toolchain, secrets, données personnelles et les suites applicables restent bloquants. Les tests d’intégration utilisant PGlite n’ouvrent pas de base de données de production. Les scripts de déploiement hérités ne sont pas nécessaires à ces vérifications et ne doivent pas être exécutés pour un test local.
 
