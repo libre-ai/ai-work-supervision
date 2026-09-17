@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "local-verification.v1",
+  "date": "2026-09-17",
+  "scope": "Local recovered-source integration; not deployment, publication or universal runtime qualification.",
+  "bun": "1.4.0-canary.1+57f349f63",
+  "frozenInstall": {
+    "command": "bun install --frozen-lockfile --ignore-scripts",
+    "exitCode": 0
+  },
+  "rootCheck": {
+    "command": "bun run check",
+    "exitCode": 0
+  },
+  "browserTests": {
+    "passed": 9,
+    "scope": "Auth PKCE/session/logout/expiry across Chromium, Firefox and WebKit"
+  },
+  "limits": [
+    "Inherited test/lint scope is preserved; no new blanket coverage or CI qualification is claimed.",
+    "Local file dependencies require neighboring repositories; packages retain individual versions and imports.",
+    "Historical source evidence is provenance, not an approval of the migrated bytes."
+  ]
+}

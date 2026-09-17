@@ -1,0 +1,63 @@
+version = 1
+
+# Annotations follow the canonical policy in libre-ai/libre-ai/LICENSING.md.
+# Within this file the last matching annotation wins, so the broad first-party
+# default comes first and the narrower boundaries are declared after it.
+
+# First-party software by default: the Rust workspace and the repository's own
+# automation and brand asset.
+[[annotations]]
+path = [
+  ".github/**",
+  ".gitignore",
+  "Cargo.lock",
+  "Cargo.toml",
+  "crates/**",
+  "deny.toml",
+]
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 Libre AI contributors"
+SPDX-License-Identifier = "EUPL-1.2"
+
+# Editorial documentation, governance files and first-party project records.
+[[annotations]]
+path = ["*.md", "**/*.md"]
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 Libre AI contributors"
+SPDX-License-Identifier = "CC-BY-4.0"
+
+# Restores `.github/**` after the Markdown block, since the last matching
+# annotation wins. Without this, the four issue templates fell to CC-BY-4.0
+# while the same files are EUPL-1.2 in feed-radar, notebook and sessions — the
+# canonical table maps `.github/**` to the first-party default with no carve-out
+# for prose. Treating the templates as documentation was defensible, but a rule
+# applied in one repository out of four is a divergence, not a rule.
+[[annotations]]
+path = [".github/**"]
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 Libre AI contributors"
+SPDX-License-Identifier = "EUPL-1.2"
+
+# Interoperability contracts. The SpecPackage delivery schema and the shared
+# workspace-identity fact set describe a data shape for other implementations
+# to consume and reimplement; they carry no runtime decision logic, so they
+# take the permissive contract boundary rather than the reciprocal one.
+[[annotations]]
+path = ["specs/**"]
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 Libre AI contributors"
+SPDX-License-Identifier = "Apache-2.0"
+
+# Grafted hub content and workspace bootstrap (ADR-0020, γ 3.5).
+[[annotations]]
+path = ["**"]
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 Libre AI contributors"
+SPDX-License-Identifier = "EUPL-1.2"
+
+# Documentation keeps the frozen-home CC-BY-4.0 grant.
+[[annotations]]
+path = ["*.md", "**/*.md", "docs/**"]
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 Libre AI contributors"
+SPDX-License-Identifier = "CC-BY-4.0"

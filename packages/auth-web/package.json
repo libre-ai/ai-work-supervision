@@ -1,0 +1,77 @@
+{
+  "name": "@libre-ai/auth-web",
+  "version": "0.2.0",
+  "description": "Provider-neutral OIDC, opaque browser sessions and Biscuit authorization for Libre AI applications (layer 4).",
+  "license": "EUPL-1.2",
+  "type": "module",
+  "keywords": [
+    "libre-ai",
+    "auth",
+    "oidc",
+    "biscuit",
+    "session",
+    "csrf"
+  ],
+  "homepage": "https://libre-ai.fr",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/libre-ai/ai-work-supervision.git",
+    "directory": "packages/auth-web"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "bun": ">=1.4.0"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check:bun:runtime": "bun ../../node_modules/@libre-ai/governance/tools/quality/check-bun-minimum.ts",
+    "check:bun": "bun ../../node_modules/@libre-ai/governance/tools/quality/check-bun-minimum.ts",
+    "check:toolchain": "bun run check:bun && bun node_modules/@libre-ai/governance/tools/quality/check-toolchain.ts",
+    "check:secret-scan": "bun run check:bun:runtime && bun node_modules/@libre-ai/governance/tools/quality/check-secret-scan.ts",
+    "check:personal-data": "bun run check:bun:runtime && bun node_modules/@libre-ai/governance/tools/quality/check-personal-data-boundary.ts",
+    "lint": "bun run check:bun:runtime && biome ci .",
+    "typecheck": "bun run check:bun:runtime && tsc --noEmit -p tsconfig.json",
+    "pretest": "bun run check:bun",
+    "test": "bun test",
+    "check": "bun run check:bun && bun run check:toolchain && bun run check:secret-scan && bun run check:personal-data && bun run lint && bun run typecheck && bun run test",
+    "e2e": "bun run check:bun:runtime && playwright test --config playwright.config.ts",
+    "precheck:bun:runtime": "bun run check:bun",
+    "precheck:toolchain": "bun run check:bun",
+    "precheck:secret-scan": "bun run check:bun",
+    "precheck:personal-data": "bun run check:bun",
+    "prelint": "bun run check:bun",
+    "pretypecheck": "bun run check:bun",
+    "precheck": "bun run check:bun",
+    "pree2e": "bun run check:bun"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@libre-ai/governance": "file:../../../project-governance",
+    "@biomejs/biome": "2.5.3",
+    "@types/bun": "1.3.14",
+    "typescript": "7.0.2",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3"
+  },
+  "types": "./src/index.ts",
+  "files": [
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx",
+    "README.md",
+    "LICENSE"
+  ],
+  "packageManager": "bun@1.4.0-canary.1",
+  "overrides": {
+    "fast-uri": "4.1.4"
+  },
+  "peerDependencies": {
+    "@libre-ai/contracts": "=0.1.0",
+    "@libre-ai/web-platform": "=0.1.0"
+  }
+}

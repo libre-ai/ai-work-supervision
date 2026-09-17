@@ -1,0 +1,25 @@
+{
+  "name": "@libre-ai/specifications",
+  "version": "0.1.0",
+  "private": true,
+  "license": "EUPL-1.2",
+  "type": "module",
+  "engines": {
+    "bun": ">=1.4.0"
+  },
+  "scripts": {
+    "check:bun": "bun ../../node_modules/@libre-ai/governance/tools/quality/check-bun-minimum.ts",
+    "pretest": "bun run check:bun",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@libre-ai/data": "file:../../../organization-data-lifecycle/packages/data",
+    "@libre-ai/web-platform": "file:../../../application-development-toolkit/packages/web-platform",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "@libre-ai/contracts-authority": "file:../../../schemas-and-contracts"
+  },
+  "devDependencies": {
+    "@libre-ai/testing": "file:../../../application-development-toolkit/packages/testing"
+  }
+}

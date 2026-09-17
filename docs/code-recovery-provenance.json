@@ -1,0 +1,895 @@
+{
+  "schemaVersion": "code-recovery.v1",
+  "files": [
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": ".gitignore",
+      "sourceBlob": "5a430e6a37059665b16bc9d2075c97607dff339d",
+      "destinationPath": ".gitignore",
+      "sha256": "19b23de57a80020117177f6f3a34b5b5ce98c2623a8e8e6e211453bbf6458bfa"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "LICENSE",
+      "sourceBlob": "3188c3e5070f000e47dab2fc6ef58b339fb2f8d5",
+      "destinationPath": "LICENSE",
+      "sha256": "21adcaa5d47faa9935e2092364a3063b141660298926ac5d7d1c60d5fb8b92f4"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "LICENSES/CC-BY-4.0.txt",
+      "sourceBlob": "13ca539f377dc705af32b8d2ce89262298ea2f06",
+      "destinationPath": "docs/source-licensing/missions/LICENSES/CC-BY-4.0.txt",
+      "sha256": "d557539df68e771cc1eedcc91d13f70fca930e508d11eedcafa4b15db49e3744"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "LICENSES/EUPL-1.2.txt",
+      "sourceBlob": "6d8cea430e21d06532225018850da91a3f44abf5",
+      "destinationPath": "LICENSES/EUPL-1.2.txt",
+      "sha256": "57fb42fbcd0b037ce528ed8f72f1ec095d67bc6825ecf1448ff39be1fe68a4b4"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "REUSE.toml",
+      "sourceBlob": "7e001f4ed05f40d1060d664f068ccedc73589903",
+      "destinationPath": "REUSE.toml",
+      "sha256": "602e619525daee8b7d294a9d71055a919142b74a077d1f168f5518c278c33139"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/README.md",
+      "sourceBlob": "42f1431c78697184b0de365a8bdc84be86e50fbe",
+      "destinationPath": "apps/missions/README.md",
+      "sha256": "3f58428ac99f771341c4f7108f4829057416ed95207649df1d69db04bdd82554"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/bun.lock",
+      "sourceBlob": "840ed486d0192617f631e8cc6f2f0bdc2c482b06",
+      "destinationPath": "apps/missions/bun.lock",
+      "sha256": "44cf7706333ada66eecc013a7d48f3007d2a1e859d9ae28407168f3c22403e74"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/migrations/0001_missions.sql",
+      "sourceBlob": "bcefa97489a670d73218705df76f6d696f5fee9a",
+      "destinationPath": "apps/missions/migrations/0001_missions.sql",
+      "sha256": "a8d06d9cca79663ec2a2ba59fee5059bf6d469db7b31ff12e19f4f6646cad456"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/package.json",
+      "sourceBlob": "cc01025d0a0ddc0d91d14180c1d81877eb79b051",
+      "destinationPath": "apps/missions/package.json",
+      "sha256": "11aef922595f295a7d0d6e176980c2dd8ecc34642a31b0767028c6c3485a508d"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/src/app/execute-command.integration.test.ts",
+      "sourceBlob": "d4fe4d179d7728f1217426b8254644fab42a8cd3",
+      "destinationPath": "apps/missions/src/app/execute-command.integration.test.ts",
+      "sha256": "3cdeb1920ae43559a03e810e7623f768b18e2e5712103fd4dd646f1248417e0d"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/src/app/execute-command.ts",
+      "sourceBlob": "bc2307c74ffdd03e558c68d6fbf2e0d578987c85",
+      "destinationPath": "apps/missions/src/app/execute-command.ts",
+      "sha256": "a2da3ad84effa093c664ba10b3df5f666b3b4f4d5937a6422f80f112f4aaba18"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/src/app/qualification.integration.test.ts",
+      "sourceBlob": "581e7efaa4ee7aec3c95aa18bd0bd26f140cad4e",
+      "destinationPath": "apps/missions/src/app/qualification.integration.test.ts",
+      "sha256": "e919c0bcd2d17b4a165a984e8f9e5f424e7f43f0abc61cfa221aa62b9933ab14"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/src/authz/mission-authorization.test.ts",
+      "sourceBlob": "f2ed627a614bd720f8c27fc0db522095c63dba8d",
+      "destinationPath": "apps/missions/src/authz/mission-authorization.test.ts",
+      "sha256": "3e53136d639fa1ff83d74e5fd8ae2bcd45ddde314e84c8b48310beba2e9b7678"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/src/authz/mission-authorization.ts",
+      "sourceBlob": "496e628626fad998a3894e76b178b0ce0566a691",
+      "destinationPath": "apps/missions/src/authz/mission-authorization.ts",
+      "sha256": "99e74bdae0f4de125b6f17ca1009d4c310af6f17b40106907299b736e58500d3"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/src/domain/mission.test.ts",
+      "sourceBlob": "96c238454eac5b77748dbea0732431bba34ea98b",
+      "destinationPath": "apps/missions/src/domain/mission.test.ts",
+      "sha256": "8107983316e03e31e7bcab4cf485497d3195b5162feb637f00d67006950700dd"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/src/domain/mission.ts",
+      "sourceBlob": "26b627df4eed105b191b956b2339587e1ac6ce73",
+      "destinationPath": "apps/missions/src/domain/mission.ts",
+      "sha256": "43e9f7e545265dc4cf1d759adb7543be0b8d9410865d391e1539379fb7c20652"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/src/persistence/mission-store.integration.test.ts",
+      "sourceBlob": "82c7889ffe4417416ccfec2fdf88a1b4a5754ded",
+      "destinationPath": "apps/missions/src/persistence/mission-store.integration.test.ts",
+      "sha256": "2562dc72ce1054d07c8c00765fce4fcd4ed932b37a1c2f16ba014b785e7d5e39"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/src/persistence/mission-store.ts",
+      "sourceBlob": "e3f458b6d02bda5fef75a86b171e339ee42e0c71",
+      "destinationPath": "apps/missions/src/persistence/mission-store.ts",
+      "sha256": "9e9a2c003d0287607f6b32a3baaec747cf528ca32ad2a0da6bb16be1c2477b06"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/src/server/handler.test.ts",
+      "sourceBlob": "30fdc22658b99527de394d950c03430a209bce40",
+      "destinationPath": "apps/missions/src/server/handler.test.ts",
+      "sha256": "7ccc006259264c5bfbad78bb285188afa7f72d59689b30975f4935406e8f3934"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/src/server/handler.ts",
+      "sourceBlob": "9b42345f66663f25b07ef4a629edf34ded1f502d",
+      "destinationPath": "apps/missions/src/server/handler.ts",
+      "sha256": "42674b1a7feaa72e4f954809c108026f31df48ca70295e9f304d34276de45594"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/src/shared/document.tsx",
+      "sourceBlob": "0cd453131f6fef81f39766e96c0b55f22a7a304d",
+      "destinationPath": "apps/missions/src/shared/document.tsx",
+      "sha256": "794f7e6f4a4acc5ba1108d5c5aab8e3d6ccf2f9217e82cf2c1ff0ab2997466de"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/src/ui/fixture.ts",
+      "sourceBlob": "bc59a33ac2b67edc1505bfddf2034d7e26e34018",
+      "destinationPath": "apps/missions/src/ui/fixture.ts",
+      "sha256": "ba4bcb8590ae571811ba889997baaab3b779da3fe673f30ca1673c62839db3e8"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/src/ui/missions-cockpit.test.tsx",
+      "sourceBlob": "66dc3168c5e4c84ba40f15977b733b2fd2cfd4cd",
+      "destinationPath": "apps/missions/src/ui/missions-cockpit.test.tsx",
+      "sha256": "fbed6080cf45f9dc874e0dbe72299f2dc31df3d865c19947b6804d147361eb4d"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "apps/missions/src/ui/missions-cockpit.tsx",
+      "sourceBlob": "8a1793aaf6cc1dcf5dfd6dd0e67a0b17d1c21888",
+      "destinationPath": "apps/missions/src/ui/missions-cockpit.tsx",
+      "sha256": "13909cc951242d388d7a9f1a30b9fa26b411d57ffd8edf94cf42cd78e7447510"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "biome.json",
+      "sourceBlob": "2990a232de00dc29ce5a269222f3196beed03973",
+      "destinationPath": "biome.json",
+      "sha256": "2a85ba456c8e26c0b3d905f904be5dbf743eb3b570cb5d4d2230d62539c7b656"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "bun.lock",
+      "sourceBlob": "32ccad042bc343cb6c859890c7b79eb96bd6b011",
+      "destinationPath": "bun.lock",
+      "sha256": "1cf761ceea533ea61d96fec8fcb81e42ff7c4355ff13a776af05aabcea153e18"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "bunfig.toml",
+      "sourceBlob": "187aad3cc3469a3aa9a58a0979a0e10f61fce2b9",
+      "destinationPath": "bunfig.toml",
+      "sha256": "5da4d7eb4d1e5c1c37d487034e56773e8e1f568daec675b114c5257942f48342"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "docs/apps/agent-board.md",
+      "sourceBlob": "15a71d2fda670bf740c038228e46d4bec9f7d994",
+      "destinationPath": "docs/apps/agent-board.md",
+      "sha256": "32178b5893d4207019b9125a86ad96eb5e14ffe44966db59a40753067f7f8ffc"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "docs/apps/missions.md",
+      "sourceBlob": "dae5957a20d09eb951df6e956d3a5bc0d275e60b",
+      "destinationPath": "docs/apps/missions.md",
+      "sha256": "03b7bcf80d77cb9832e2eb6023a01f1ecd138ef2da3c8f7c31f66ea28ee35800"
+    },
+    {
+      "sourceRepository": "missions",
+      "sourceCommit": "081cf8a2bed1a20a9ad675de6761f30df3cf93e3",
+      "sourcePath": "package.json",
+      "sourceBlob": "4d320555a6656e84233c09dc2cfeb8f3018bc436",
+      "destinationPath": "package.json",
+      "sha256": "ffa2b30eb7ff80f45bcc782888b6fbf42f01228b45ee10cf2260510b95022262"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "LICENSES/CC-BY-4.0.txt",
+      "sourceBlob": "13ca539f377dc705af32b8d2ce89262298ea2f06",
+      "destinationPath": "docs/source-licensing/spec-studio/LICENSES/CC-BY-4.0.txt",
+      "sha256": "d557539df68e771cc1eedcc91d13f70fca930e508d11eedcafa4b15db49e3744"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "LICENSES/EUPL-1.2.txt",
+      "sourceBlob": "6d8cea430e21d06532225018850da91a3f44abf5",
+      "destinationPath": "LICENSES/EUPL-1.2.txt",
+      "sha256": "57fb42fbcd0b037ce528ed8f72f1ec095d67bc6825ecf1448ff39be1fe68a4b4"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/README.md",
+      "sourceBlob": "969e6cb3d6150c56d79887381bd3c427716cac57",
+      "destinationPath": "apps/specifications/README.md",
+      "sha256": "86cca42a09676344162204fdb2be80c5a792aeec0bd8711e596fdf02a6af4da1"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/bun.lock",
+      "sourceBlob": "36c8e099644e0fe1f2322acb26adb69201f976ed",
+      "destinationPath": "apps/specifications/bun.lock",
+      "sha256": "e9c36096c574f0662625f265a41bf673b7c0486b5ed99cd60465920b6ab2e71b"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/migrations/0001_specifications.sql",
+      "sourceBlob": "c33654b4cef813d43c6423581413b3d5ae47f2af",
+      "destinationPath": "apps/specifications/migrations/0001_specifications.sql",
+      "sha256": "00507a186494131060f3791253aad20caba576d131118288ff0fedda5bf84867"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/migrations/0002_spec_packages.sql",
+      "sourceBlob": "675de68764f270984183cf8f1589a2b9f629db01",
+      "destinationPath": "apps/specifications/migrations/0002_spec_packages.sql",
+      "sha256": "c141742091e58a1904c8180b7e52d1f126e3ff2bf8fd1df31f81b8c2c8862756"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/package.json",
+      "sourceBlob": "b3bc925591121f2152853637124ebbf3cc01ce6c",
+      "destinationPath": "apps/specifications/package.json",
+      "sha256": "a7a6bec20bb35752eaacaccb25b8a07247ab896adcd96980acb22a7cc5e6b966"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/app/accept-package.test.ts",
+      "sourceBlob": "68f0d2769cfc911d16c62ff827f8ca43adea19cd",
+      "destinationPath": "apps/specifications/src/app/accept-package.test.ts",
+      "sha256": "6e0734e2a94e0a3f21cddc8b4e22c101e4ebda6026e9a277621b24fc00d7f1ac"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/app/accept-package.ts",
+      "sourceBlob": "9303022b41815d809410299548fd0cbf994310be",
+      "destinationPath": "apps/specifications/src/app/accept-package.ts",
+      "sha256": "98fbb55d542bad06cabbb60b8769bf8c7bd692610dcc8f96a9e4ab3285aefa55"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/app/execute-command.integration.test.ts",
+      "sourceBlob": "4a66ac3f3042b0fd15a5e14e86ead8f6476d907b",
+      "destinationPath": "apps/specifications/src/app/execute-command.integration.test.ts",
+      "sha256": "1baba8cb430664a47523b7b1680957f6ca4c8d181e2a2134e1cd2006c542d29c"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/app/execute-command.ts",
+      "sourceBlob": "0f8a970cab52148556747eb36d407d74f9ffaf67",
+      "destinationPath": "apps/specifications/src/app/execute-command.ts",
+      "sha256": "187c0d2efcaa911cb590425f23272a43e71b5ccd512381fda2b96b2b1a3fc3df"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/app/persist-acceptance.integration.test.ts",
+      "sourceBlob": "c82284f610d2016b9917eb0b8effd5d568020115",
+      "destinationPath": "apps/specifications/src/app/persist-acceptance.integration.test.ts",
+      "sha256": "0efdbaa24db4b389bc7aab9e1cb6eb842470bdb0cd98e63ec14b983d4316813d"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/app/persist-acceptance.ts",
+      "sourceBlob": "2356376a09e9fdb4abd65a01e55c827f2cd8e225",
+      "destinationPath": "apps/specifications/src/app/persist-acceptance.ts",
+      "sha256": "1ffc2067fdecae1c6bebddfb19be68bba049952a021d402b582298edfa080cb6"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/domain/spec-package.test.ts",
+      "sourceBlob": "2900792636183e4506faa76461ced820f965ed8a",
+      "destinationPath": "apps/specifications/src/domain/spec-package.test.ts",
+      "sha256": "74c9913ae0eef39b84f0655b3a6dc13d9af0ac7c19249c018119828c964d6e27"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/domain/spec-package.ts",
+      "sourceBlob": "2cd38d8076f30a8664bae317840c802dd3abdce6",
+      "destinationPath": "apps/specifications/src/domain/spec-package.ts",
+      "sha256": "471b282f64e6d01dc741532e36c51f479b4cbac47f009cbf5ba652594629ca08"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/domain/workspace.test.ts",
+      "sourceBlob": "13dc93737f97eba8ac133d6aa1ebef84ba6e9ca4",
+      "destinationPath": "apps/specifications/src/domain/workspace.test.ts",
+      "sha256": "d84b04f12a30c40fd63166eccf88cb22e4262b775f54c2e0fe3f6d3c34982dff"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/domain/workspace.ts",
+      "sourceBlob": "c2d0a3dcc5acf7a1f700f84f5d102a6eb2ccefad",
+      "destinationPath": "apps/specifications/src/domain/workspace.ts",
+      "sha256": "37e736c1da34a4f623b44ef3084d4a678ca9acf02ad4039fc0835a3c1e828636"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/persistence/spec-package-store.integration.test.ts",
+      "sourceBlob": "cdff71c919bae67372dfc035e83125622770b37a",
+      "destinationPath": "apps/specifications/src/persistence/spec-package-store.integration.test.ts",
+      "sha256": "f6d7d3099cf5c9e8aa9ce19f455b8f717191ddce36746d1a34150fb8a4cf85a1"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/persistence/spec-package-store.ts",
+      "sourceBlob": "fefa3d90a7f892c9496a27801f34add8021164dc",
+      "destinationPath": "apps/specifications/src/persistence/spec-package-store.ts",
+      "sha256": "728f265cbc43d46a7c13a6cad8885dd69970d86611f63e26b8696faf9a9e79d1"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/persistence/spec-workspace-store.integration.test.ts",
+      "sourceBlob": "aff47c056ebdf493dc4e6e10a87a8c15193828dd",
+      "destinationPath": "apps/specifications/src/persistence/spec-workspace-store.integration.test.ts",
+      "sha256": "2fea90ce0ae7bc27a2f2f16b8bfa7faff8e319229334e026b5aac37a406e74be"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/persistence/spec-workspace-store.ts",
+      "sourceBlob": "ae3aeee8501189d9cccc857620db2cfc499eae06",
+      "destinationPath": "apps/specifications/src/persistence/spec-workspace-store.ts",
+      "sha256": "3affc9aecf221102532ced5963f4ea25346ad063f19bc2556a10ce6a65620b72"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/server/handler.test.ts",
+      "sourceBlob": "1b21433a2269194cbfa8bb969d46b9a8ed4b62f8",
+      "destinationPath": "apps/specifications/src/server/handler.test.ts",
+      "sha256": "d158081e32ab2d7d6d3f651e477b4a9f3a6f116209b183fdc284831d834122d6"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/server/handler.ts",
+      "sourceBlob": "7e2fc257454eb906fb3b2a06459348144b417da5",
+      "destinationPath": "apps/specifications/src/server/handler.ts",
+      "sha256": "eb9fc6410509b22fc016909dccf85aa71a416fcac82be64fe0b0203861f1cb1b"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/shared/document.tsx",
+      "sourceBlob": "f98dfed8b740025e56b27b080147201271225e0d",
+      "destinationPath": "apps/specifications/src/shared/document.tsx",
+      "sha256": "db040352de1fe7d76f2cf095e833364d0fd7d5d9d43ba5063ec65cd45a9190bd"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/ui/fixture.ts",
+      "sourceBlob": "b874f3a0b75ae569b0a222f2b21e67a7bb4ea38e",
+      "destinationPath": "apps/specifications/src/ui/fixture.ts",
+      "sha256": "c90ac48241c3393e12cd5cd84081c4ffa0a07a64fef9fdb79cbc6f14abc12e22"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/ui/specifications-cockpit.test.tsx",
+      "sourceBlob": "798a2e6330ee77d8d3e17869ff7f3b09d476068f",
+      "destinationPath": "apps/specifications/src/ui/specifications-cockpit.test.tsx",
+      "sha256": "6e3248c7c2e2bf6e2e41585a99dff2ea62630f66bcaf19c27f799a78f7a6aab8"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "apps/specifications/src/ui/specifications-cockpit.tsx",
+      "sourceBlob": "b3c09586c066da5c6d9f555e603ff93631b30847",
+      "destinationPath": "apps/specifications/src/ui/specifications-cockpit.tsx",
+      "sha256": "e6474bf70c049b83e48595bc3e6ab5c115700eddb265d60743faf8f5de1821d8"
+    },
+    {
+      "sourceRepository": "spec-studio",
+      "sourceCommit": "a87f0b642668a9964aa367444e39f15ff48e47dc",
+      "sourcePath": "docs/apps/specifications.md",
+      "sourceBlob": "a5aa91e0fcca1c167783d47cfbdfb6e2e1ae498f",
+      "destinationPath": "docs/apps/specifications.md",
+      "sha256": "0369848420b8ea62f60e0f62c13215598709bff90e678ae1b6b78fc986e60b31"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": ".gitignore",
+      "sourceBlob": "5a430e6a37059665b16bc9d2075c97607dff339d",
+      "destinationPath": "packages/auth-web/.gitignore",
+      "sha256": "19b23de57a80020117177f6f3a34b5b5ce98c2623a8e8e6e211453bbf6458bfa"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "G2-I01-QUALIFICATION.md",
+      "sourceBlob": "1f85e6035eb43b4acd40b3fba53109a4140f1ccd",
+      "destinationPath": "packages/auth-web/G2-I01-QUALIFICATION.md",
+      "sha256": "a358d3bcdc6964f83dfb8ab02a3c9748c8f6009ba260dc6185e8b43e004efeec"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "LICENSE",
+      "sourceBlob": "6d8cea430e21d06532225018850da91a3f44abf5",
+      "destinationPath": "packages/auth-web/LICENSE",
+      "sha256": "57fb42fbcd0b037ce528ed8f72f1ec095d67bc6825ecf1448ff39be1fe68a4b4"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "LICENSES/EUPL-1.2.txt",
+      "sourceBlob": "6d8cea430e21d06532225018850da91a3f44abf5",
+      "destinationPath": "packages/auth-web/LICENSES/EUPL-1.2.txt",
+      "sha256": "57fb42fbcd0b037ce528ed8f72f1ec095d67bc6825ecf1448ff39be1fe68a4b4"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "README.md",
+      "sourceBlob": "3ebf9cf56d00a8f108e16d2a8b4f2454d83a4726",
+      "destinationPath": "packages/auth-web/README.md",
+      "sha256": "3ee0202aa6519691447567adc108e22f1c432dfca23cb2f6b773c7190b7f4075"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "REUSE.toml",
+      "sourceBlob": "4fb33b8ad49e539bee3b762bcfc2f3c439b7dca4",
+      "destinationPath": "packages/auth-web/REUSE.toml",
+      "sha256": "df51053f6922587cb11bacda8140a3ee18df399160faf3043897b0243eb5ca86"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "biome.json",
+      "sourceBlob": "42bfe193e42f2d45caa5b1450da4b40b0138532e",
+      "destinationPath": "packages/auth-web/biome.json",
+      "sha256": "aef412798f637cd348188f1071fb1ea7c01c5e4bb3de8cd878a25f4dd4a5173d"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "bun.lock",
+      "sourceBlob": "ea157a610fc711ae6fc39a7ef6cc3887b834c28e",
+      "destinationPath": "packages/auth-web/bun.lock",
+      "sha256": "9efeb320e04f91dba4cd747a81d54d5e757f6c131d3f084174b781ebf4804c91"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "bunfig.toml",
+      "sourceBlob": "187aad3cc3469a3aa9a58a0979a0e10f61fce2b9",
+      "destinationPath": "packages/auth-web/bunfig.toml",
+      "sha256": "5da4d7eb4d1e5c1c37d487034e56773e8e1f568daec675b114c5257942f48342"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "e2e/auth.e2e.ts",
+      "sourceBlob": "ca9ec91a6d9b88b00cfef1c9c43fb48f83053fe4",
+      "destinationPath": "packages/auth-web/e2e/auth.e2e.ts",
+      "sha256": "e427841f79649d06bea3f929d381ac5b35e26ca5b5de60a14c8f505e4c9228cd"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "e2e/serve-e2e.ts",
+      "sourceBlob": "f75a4b9f462708e33ac50b4cb7659c6d637eca7a",
+      "destinationPath": "packages/auth-web/e2e/serve-e2e.ts",
+      "sha256": "8a8da341dd7b34db06b669d07650c13c4cf527e7a622495d7c5ad2837f81e89e"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "evidence/BROWSER-SESSION-SECURITY-REVIEW.md",
+      "sourceBlob": "476c19464fde0cdadf350e3fbfb063f487449182",
+      "destinationPath": "packages/auth-web/evidence/BROWSER-SESSION-SECURITY-REVIEW.md",
+      "sha256": "546b50abecea4d224209b5516f6b17eb756b935591609667f39484340e188725"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "evidence/GATE-VERDICT-I01.md",
+      "sourceBlob": "31a223146cd848b7298c85f9a28fc12c21931de1",
+      "destinationPath": "packages/auth-web/evidence/GATE-VERDICT-I01.md",
+      "sha256": "eb9c249baf2d069eb823924782ae2f27803cf0a2a89a53fe56adbb4e463c9f6c"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "evidence/IDENTITY-THREAT-MODEL.md",
+      "sourceBlob": "bb926b2a9067d9927012ab61fbe2719c517f6664",
+      "destinationPath": "packages/auth-web/evidence/IDENTITY-THREAT-MODEL.md",
+      "sha256": "672d8bb71d8fa56cb086e015053ed91156c9d8f0e34536aafb33eb360d850028"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "package.json",
+      "sourceBlob": "dd8aedbe65ae668f8cc7550e1f8e8448f2b2b5da",
+      "destinationPath": "packages/auth-web/package.json",
+      "sha256": "a72e3bdb0fc28156f0eee9b78dd16b6ff1b61c80dfef3c6c105dab7eec1c7287"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "playwright.config.ts",
+      "sourceBlob": "7e1cb7070fc7051a63a6fbfde751ce9029176982",
+      "destinationPath": "packages/auth-web/playwright.config.ts",
+      "sha256": "183fa8ca5846abfc0ffc557d4f937f3f06377dc7534b2c48c09f74bdf99056d0"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/clock.ts",
+      "sourceBlob": "bbc51ef228d6b6aee8d1309d102858343d009f83",
+      "destinationPath": "packages/auth-web/src/clock.ts",
+      "sha256": "22676ac51ba9047f20d2d721bce847b25d09c3c6292a78260621b3afa3878bf5"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/csrf/csrf.test.ts",
+      "sourceBlob": "d0b0f20c471ddb2db13c59b2700307631907aab6",
+      "destinationPath": "packages/auth-web/src/csrf/csrf.test.ts",
+      "sha256": "95dac63e812711c23e4e2512774e02fafd1252bd1f6f8f80947b5308bbfc39bd"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/csrf/verify.ts",
+      "sourceBlob": "5e569d2422c1e24db030dfb562382493c45649e9",
+      "destinationPath": "packages/auth-web/src/csrf/verify.ts",
+      "sha256": "135d0597f98ca22758f03a7724f552e955e6e338660be4cb703a61cdf682f919"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/dev-issuer/issuer.ts",
+      "sourceBlob": "fd9bc8ac21d6a9c3e2a35d25e877d4895952b374",
+      "destinationPath": "packages/auth-web/src/dev-issuer/issuer.ts",
+      "sha256": "9b420e88ed5e01adcd01784dfdc6cd9639ece641cea2ada4d235f37dd7ba85f4"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/http/handlers.test.ts",
+      "sourceBlob": "a532c8c6e07bf0ea24596aa92b723044866894ef",
+      "destinationPath": "packages/auth-web/src/http/handlers.test.ts",
+      "sha256": "40c84c3985cc702a744e28f25f46bc5e0639d2f1dd7b43ed985004b9f449eced"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/http/handlers.ts",
+      "sourceBlob": "52d577ae4c8914bcdc15e211c6c3689b4e0b28ca",
+      "destinationPath": "packages/auth-web/src/http/handlers.ts",
+      "sha256": "497eb2914344bded8f4c462146febdaeee91dd8058441692608e70fbe03df827"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/index.ts",
+      "sourceBlob": "f1a687cb70784d6218f4857eb84af4c75ee0cbe9",
+      "destinationPath": "packages/auth-web/src/index.ts",
+      "sha256": "e13d8befc7b88d715e3cffe64de58a91dbb61b1f6dac01c12231725a66ed31e5"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/membership/directory.ts",
+      "sourceBlob": "329dd706df8270e77610073daa72b085d4b258d5",
+      "destinationPath": "packages/auth-web/src/membership/directory.ts",
+      "sha256": "63fec074e84d05c2539d6d1d2c598bff9c3f5886734d2404b445aeead4dd4f0f"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/observability/redaction.test.ts",
+      "sourceBlob": "c2f724bf11bdb0a475efdaed14c3e39560b6b215",
+      "destinationPath": "packages/auth-web/src/observability/redaction.test.ts",
+      "sha256": "8d25f2acf4813485f44822a19bdeda8cd564fc54561eb7e30227c9db8cb1f52d"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/oidc/jws.test.ts",
+      "sourceBlob": "4c768501fd4dbd3fd35a7acb68554d31732e5385",
+      "destinationPath": "packages/auth-web/src/oidc/jws.test.ts",
+      "sha256": "106e65906c1c7a52195a6a4e81aced2110a606bce55482b5e158e944be869ba2"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/oidc/jws.ts",
+      "sourceBlob": "c3c160cca30750de2933d375d0f60c820ce3076e",
+      "destinationPath": "packages/auth-web/src/oidc/jws.ts",
+      "sha256": "7b203a120cec222fb59746abf46dcfe6812d4f2664393e9bd389a92db535dd9e"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/oidc/transaction-store.ts",
+      "sourceBlob": "b19c56e481f3fc928395ee3bde2e4db53dbd8b98",
+      "destinationPath": "packages/auth-web/src/oidc/transaction-store.ts",
+      "sha256": "98acaf8b62af2f09dd3f4d1cb109099a91ed6f93341dadc37497d6ca6ba4215f"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/oidc/transaction.test.ts",
+      "sourceBlob": "7e0c7f8978dceb70f1061e8fa3fe7a613e6da753",
+      "destinationPath": "packages/auth-web/src/oidc/transaction.test.ts",
+      "sha256": "4f7f22a5d6c7c31eaf27abc57a40605484d06e22d2d6f3600409f35bc2cb7785"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/oidc/transaction.ts",
+      "sourceBlob": "754ea5618ed3703030bee965148b8c15d73e20e9",
+      "destinationPath": "packages/auth-web/src/oidc/transaction.ts",
+      "sha256": "cbc9eca562b4f1ddca962b7e7a544dc419e5b1c2c35f1a83f4258faac7494d8b"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/session/concurrency.test.ts",
+      "sourceBlob": "c9db7e0ce0387e49faa711d9b2ae9ece794c5984",
+      "destinationPath": "packages/auth-web/src/session/concurrency.test.ts",
+      "sha256": "c790c94c6d9f3118317c1b030f37794a31204648547a7b637da295d538ca58ea"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/session/digest.ts",
+      "sourceBlob": "6f69ab8e710d070580f3c54ce642238a66ce0204",
+      "destinationPath": "packages/auth-web/src/session/digest.ts",
+      "sha256": "619d884c0f953a5ffcbdea11974bd6ceb92bf0492749f82ec47c2e677bf6017d"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/session/lifecycle.ts",
+      "sourceBlob": "228dd75a220b09ddc26bd95fd76c7b24a1a063b4",
+      "destinationPath": "packages/auth-web/src/session/lifecycle.ts",
+      "sha256": "357c654e3af3dda34640173fbfb86f8c9605dcbddf93ac550b114106f39561a1"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/session/record.ts",
+      "sourceBlob": "015a0e9c021661b79de072d224a9d33eaa8388f3",
+      "destinationPath": "packages/auth-web/src/session/record.ts",
+      "sha256": "b6592ab0c232b417d32324f6fe16b9d70670392da6f241d167d3d84550208967"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/session/session.test.ts",
+      "sourceBlob": "030c64a07f32223c9a0f078dcabd742926e2181f",
+      "destinationPath": "packages/auth-web/src/session/session.test.ts",
+      "sha256": "26c16ddd5580de76ac4864c619c9f8fc4bde1d686579af51254fd4925cde1d94"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "src/session/store.ts",
+      "sourceBlob": "91c0202b0832c8b01f09d848a475d648d8023718",
+      "destinationPath": "packages/auth-web/src/session/store.ts",
+      "sha256": "e35f3b8c45b4236162f977a399f9a6f684c611deeaaef66e741a6a0108d3c9a8"
+    },
+    {
+      "sourceRepository": "auth",
+      "sourceCommit": "f650ed8fc5346c8e57616a525d4877bca44db531",
+      "sourcePath": "tsconfig.json",
+      "sourceBlob": "8a008b97a898ba9431cfa74403a2dd354447070b",
+      "destinationPath": "packages/auth-web/tsconfig.json",
+      "sha256": "c0d62641cd239e17ffeab100b96f5452c49f14129398ac3a8460327b8cebf656"
+    }
+  ],
+  "excluded": [
+    {
+      "source": "missions",
+      "path": ".github/dependabot.yml",
+      "reason": "preserve current presentation and avoid activating historical agent/provider configuration"
+    },
+    {
+      "source": "missions",
+      "path": ".github/workflows/ci.yml",
+      "reason": "preserve current presentation and avoid activating historical agent/provider configuration"
+    },
+    {
+      "source": "missions",
+      "path": ".github/workflows/context-hygiene.yml",
+      "reason": "preserve current presentation and avoid activating historical agent/provider configuration"
+    },
+    {
+      "source": "missions",
+      "path": "AGENTS.md",
+      "reason": "preserve current presentation and avoid activating historical agent/provider configuration"
+    },
+    {
+      "source": "missions",
+      "path": "CLAUDE.md",
+      "reason": "preserve current presentation and avoid activating historical agent/provider configuration"
+    },
+    {
+      "source": "missions",
+      "path": "README.md",
+      "reason": "preserve current presentation and avoid activating historical agent/provider configuration"
+    },
+    {
+      "source": "missions",
+      "path": "project.v1.yaml",
+      "reason": "preserve current presentation and avoid activating historical agent/provider configuration"
+    },
+    {
+      "source": "auth",
+      "path": ".github/dependabot.yml",
+      "reason": "preserve current presentation and avoid activating historical agent/provider configuration"
+    },
+    {
+      "source": "auth",
+      "path": ".github/workflows/ci.yml",
+      "reason": "preserve current presentation and avoid activating historical agent/provider configuration"
+    },
+    {
+      "source": "auth",
+      "path": ".github/workflows/context-hygiene.yml",
+      "reason": "preserve current presentation and avoid activating historical agent/provider configuration"
+    },
+    {
+      "source": "auth",
+      "path": "AGENTS.md",
+      "reason": "preserve current presentation and avoid activating historical agent/provider configuration"
+    },
+    {
+      "source": "auth",
+      "path": "CLAUDE.md",
+      "reason": "preserve current presentation and avoid activating historical agent/provider configuration"
+    },
+    {
+      "source": "auth",
+      "path": "project.v1.yaml",
+      "reason": "preserve current presentation and avoid activating historical agent/provider configuration"
+    }
+  ],
+  "status": "Source imported and locally tested; no publication or deployment performed.",
+  "adaptations": [
+    {
+      "path": ".gitignore",
+      "sourceSha256": "19b23de57a80020117177f6f3a34b5b5ce98c2623a8e8e6e211453bbf6458bfa",
+      "currentSha256": "8a2de8b3e4d25c532fd89bd03eb95e9f1c09e8876abf2a54abfa7f74aa04db9c",
+      "change": "Local composition, build/test adaptation or current presentation; original source remains preserved."
+    },
+    {
+      "path": "REUSE.toml",
+      "sourceSha256": "602e619525daee8b7d294a9d71055a919142b74a077d1f168f5518c278c33139",
+      "currentSha256": "767f886c45cfd2917104262c394b102c2e4646bd0958c97167be40f25671353d",
+      "change": "Local composition, build/test adaptation or current presentation; original source remains preserved."
+    },
+    {
+      "path": "apps/missions/package.json",
+      "sourceSha256": "11aef922595f295a7d0d6e176980c2dd8ecc34642a31b0767028c6c3485a508d",
+      "currentSha256": "9711aa5bde65cfee2ed94aa219371b12a68e5098fdb68842144968dfdfc26c36",
+      "change": "Local composition, build/test adaptation or current presentation; original source remains preserved."
+    },
+    {
+      "path": "bun.lock",
+      "sourceSha256": "1cf761ceea533ea61d96fec8fcb81e42ff7c4355ff13a776af05aabcea153e18",
+      "currentSha256": "ce376f1ba2e71c62320a578ff73c1da5507bc3d78c6a1d204626ead1f80f8551",
+      "change": "Local composition, build/test adaptation or current presentation; original source remains preserved."
+    },
+    {
+      "path": "package.json",
+      "sourceSha256": "ffa2b30eb7ff80f45bcc782888b6fbf42f01228b45ee10cf2260510b95022262",
+      "currentSha256": "e0f40211c7bb0cf52c4b2d2016f4a40fcdd687367363d07361c1d928d9391bdc",
+      "change": "Local composition, build/test adaptation or current presentation; original source remains preserved."
+    },
+    {
+      "path": "apps/specifications/package.json",
+      "sourceSha256": "a7a6bec20bb35752eaacaccb25b8a07247ab896adcd96980acb22a7cc5e6b966",
+      "currentSha256": "c90a229336326eabd3128750a679ad7b1c4b779b8bd0e8f48478732264e38171",
+      "change": "Local composition, build/test adaptation or current presentation; original source remains preserved."
+    },
+    {
+      "path": "apps/specifications/src/app/persist-acceptance.integration.test.ts",
+      "sourceSha256": "0efdbaa24db4b389bc7aab9e1cb6eb842470bdb0cd98e63ec14b983d4316813d",
+      "currentSha256": "28368e11304300180fa21d69056e8949a3fe16b2b68fa90204a377fa0308b26b",
+      "change": "Local composition, build/test adaptation or current presentation; original source remains preserved."
+    },
+    {
+      "path": "packages/auth-web/biome.json",
+      "sourceSha256": "aef412798f637cd348188f1071fb1ea7c01c5e4bb3de8cd878a25f4dd4a5173d",
+      "currentSha256": "5319bdb96badbebc9647f33c2d3ca9d9d76b3d50e32aba0cf281df21a398976d",
+      "change": "Local composition, build/test adaptation or current presentation; original source remains preserved."
+    },
+    {
+      "path": "packages/auth-web/e2e/serve-e2e.ts",
+      "sourceSha256": "8a8da341dd7b34db06b669d07650c13c4cf527e7a622495d7c5ad2837f81e89e",
+      "currentSha256": "09b027a102d848f5b1ec92e27f8fc6eba89e497c5b5f0479141bd9b974619d1d",
+      "change": "Local composition, build/test adaptation or current presentation; original source remains preserved."
+    },
+    {
+      "path": "packages/auth-web/package.json",
+      "sourceSha256": "a72e3bdb0fc28156f0eee9b78dd16b6ff1b61c80dfef3c6c105dab7eec1c7287",
+      "currentSha256": "63d662f72e6871177358b14ac3ac034d6793452ac8a474d7146b484ff05c1eb5",
+      "change": "Local composition, build/test adaptation or current presentation; original source remains preserved."
+    }
+  ]
+}
