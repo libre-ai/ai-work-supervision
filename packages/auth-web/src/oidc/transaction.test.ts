@@ -38,7 +38,13 @@ beforeEach(async () => {
     tenantId: `ten_${"a".repeat(16)}`,
     userId: `usr_${"b".repeat(16)}`,
   });
-  flow = await OidcLoginFlow.create({
+  flow = await createFlow();
+});
+
+async function createFlow(
+  overrides: Partial<Parameters<typeof OidcLoginFlow.create>[0]> = {},
+): Promise<OidcLoginFlow> {
+  return OidcLoginFlow.create({
     audience: AUDIENCE,
     clock,
     directory,
@@ -47,8 +53,9 @@ beforeEach(async () => {
     store: new InMemoryOidcTransactionStore(),
     tokenEndpoint: (request) => issuer.exchangeCode(request),
     transactionDigestKey: new Uint8Array(32).fill(9),
+    ...overrides,
   });
-});
+}
 
 async function authorizeFromUrl(
   authorizationUrl: string,
@@ -91,6 +98,128 @@ describe("OIDC login flow", () => {
     expect(completed.facts.oidc.subjectDigest).toBe(await issuer.subjectDigest(SUBJECT));
     expect(completed.facts.oidc.subjectDigest).toBe(await sha256Hex(`${ISSUER}|${SUBJECT}`));
     expect(completed.facts.oidc.authenticatedAt).toBe(clock.now().toISOString());
+  });
+
+  test("accepts a token issued after the exchange crosses a clock second", async () => {
+    flow = await createFlow({
+      tokenEndpoint: async (request) => {
+        clock.advance(1000);
+        return issuer.exchangeCode(request);
+      },
+    });
+    const started = await flow.start();
+    const params = await authorizeFromUrl(started.authorizationUrl);
+    const completed = await flow.complete(params, started.transactionCookieValue);
+    expect(completed.ok).toBeTrue();
+    if (!completed.ok) throw new Error("expected fresh issued token");
+    expect(completed.facts.oidc.authenticatedAt).toBe("2026-07-19T09:00:01.000Z");
+  });
+
+  test("records the validation instant after waiting for JWKS", async () => {
+    flow = await createFlow({
+      jwks: async () => {
+        clock.advance(1000);
+        return issuer.jwks();
+      },
+    });
+    const started = await flow.start();
+    const params = await authorizeFromUrl(started.authorizationUrl);
+    const completed = await flow.complete(params, started.transactionCookieValue);
+    expect(completed.ok).toBeTrue();
+    if (!completed.ok) throw new Error("expected current token");
+    expect(completed.facts.oidc.authenticatedAt).toBe("2026-07-19T09:00:01.000Z");
+  });
+
+  test("refuses a token that expires while JWKS is pending", async () => {
+    flow = await createFlow({
+      jwks: async () => {
+        clock.advance(5 * 60 * 1000);
+        return issuer.jwks();
+      },
+    });
+    const started = await flow.start();
+    const params = await authorizeFromUrl(started.authorizationUrl);
+    expect(await flow.complete(params, started.transactionCookieValue)).toEqual({
+      code: "auth.oidc_claim_invalid",
+      ok: false,
+    });
+  });
+
+  for (const phase of ["exchange", "jwks"] as const) {
+    test(`refuses a transaction that expires during ${phase}`, async () => {
+      flow = await createFlow({
+        tokenEndpoint: async (request) => {
+          const result = await issuer.exchangeCode(request);
+          if (phase === "exchange") clock.advance(OIDC_TRANSACTION_LIFETIME_MS + 1);
+          return result;
+        },
+        jwks: async () => {
+          if (phase === "jwks") clock.advance(OIDC_TRANSACTION_LIFETIME_MS + 1);
+          return issuer.jwks();
+        },
+      });
+      const started = await flow.start();
+      const params = await authorizeFromUrl(started.authorizationUrl);
+      expect(await flow.complete(params, started.transactionCookieValue)).toEqual({
+        code: "auth.oidc_state_invalid",
+        ok: false,
+      });
+      expect(await flow.complete(params, started.transactionCookieValue)).toEqual({
+        code: "auth.oidc_state_invalid",
+        ok: false,
+      });
+    });
+  }
+
+  test("an already expired transaction refuses before either provider call", async () => {
+    let exchangeCalls = 0;
+    let jwksCalls = 0;
+    flow = await createFlow({
+      tokenEndpoint: async (request) => {
+        exchangeCalls += 1;
+        return issuer.exchangeCode(request);
+      },
+      jwks: async () => {
+        jwksCalls += 1;
+        return issuer.jwks();
+      },
+    });
+    const started = await flow.start();
+    const params = await authorizeFromUrl(started.authorizationUrl);
+    clock.advance(OIDC_TRANSACTION_LIFETIME_MS + 1);
+    expect(await flow.complete(params, started.transactionCookieValue)).toEqual({
+      code: "auth.oidc_state_invalid",
+      ok: false,
+    });
+    expect(exchangeCalls).toBe(0);
+    expect(jwksCalls).toBe(0);
+  });
+
+  test("a genuinely future token still refuses after exchange and JWKS waits", async () => {
+    let nonce = "";
+    flow = await createFlow({
+      tokenEndpoint: async () => {
+        clock.advance(1000);
+        return {
+          idToken: await issuer.signIdToken(
+            { audience: AUDIENCE, nonce, subject: SUBJECT },
+            { issuedAtSeconds: Math.floor(clock.now().getTime() / 1000) + 2 },
+          ),
+          ok: true,
+        };
+      },
+      jwks: async () => {
+        clock.advance(1000);
+        return issuer.jwks();
+      },
+    });
+    const started = await flow.start();
+    nonce = new URL(started.authorizationUrl).searchParams.get("nonce") ?? "";
+    const params = await authorizeFromUrl(started.authorizationUrl);
+    expect(await flow.complete(params, started.transactionCookieValue)).toEqual({
+      code: "auth.oidc_claim_invalid",
+      ok: false,
+    });
   });
 
   test("the transaction is one-use: a second completion refuses", async () => {

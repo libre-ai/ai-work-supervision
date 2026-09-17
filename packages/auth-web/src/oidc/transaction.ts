@@ -95,10 +95,10 @@ export class OidcLoginFlow {
     const transaction = await this.options.store.consumeByDigest(
       await hmacSha256Hex(this.digestKey, transactionCookieValue),
     );
-    const now = this.options.clock.now();
+    const startedAt = this.options.clock.now();
     if (
       transaction === null ||
-      now.getTime() > transaction.expiresAtMs ||
+      startedAt.getTime() > transaction.expiresAtMs ||
       params.state.length === 0 ||
       params.state !== transaction.state
     ) {
@@ -114,12 +114,20 @@ export class OidcLoginFlow {
       return { code: "auth.oidc_claim_invalid", ok: false };
     }
 
+    const jwks = await this.options.jwks();
+    // Provider I/O can cross issuance or expiry boundaries; validate against
+    // the clock after both responses, without extending the one-use transaction.
+    const now = this.options.clock.now();
+    if (now.getTime() > transaction.expiresAtMs) {
+      return { code: "auth.oidc_state_invalid", ok: false };
+    }
+
     const verified = await verifyIdToken({
       expectedAudience: this.options.audience,
       expectedIssuer: this.options.issuer,
       expectedNonce: transaction.nonce,
       idToken: exchanged.idToken,
-      jwks: await this.options.jwks(),
+      jwks,
       now,
     });
     if (!verified.ok) {
