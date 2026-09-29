@@ -90,7 +90,11 @@ export async function executeMissionCommand(
     // 4. Persist the next aggregate + append its events under optimistic
     //    concurrency. A lost race refuses; the transaction wrote nothing.
     try {
-      await saveMission(tx, decision.next, decision.events, now);
+      // Exports are authorized reads; progress with no domain events still writes
+      // its cursor, so an empty event list must not suppress persistence.
+      if (request.command.type !== "ExportMissionRecord") {
+        await saveMission(tx, decision.next, decision.events, now, current);
+      }
     } catch (error) {
       if (error instanceof MissionRevisionConflictError) return refuse("mission.revision_conflict");
       throw error;

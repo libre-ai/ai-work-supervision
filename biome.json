@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!apps/missions/src", "!apps/missions/e2e"]
+    "includes": ["**"]
   },
   "formatter": {
     "enabled": true,

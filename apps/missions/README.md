@@ -32,3 +32,27 @@ bounded implementation work package and conformance review are approved.
 ```
 bun test
 ```
+
+## Persistence contract
+
+`saveMission(executor, next, events, recordedAt, previous)` requires the position
+observed before the domain decision: `{ revision, eventCursor }`, or `null` for
+creation. Updates compare both values under the active organization transaction.
+A concurrent progress event can change the cursor without changing revision;
+its position must never be overwritten by a stale transition. A conflict updates
+no row and appends no event. The caller must keep aggregate and event writes in
+one transaction, as `executeMissionCommand` does.
+
+`ExportMissionRecord` is an authorized, revision-checked read and never calls
+persistence. An empty event list alone does not imply a read: progress advances
+the cursor. Rejected exports retain the same authorization and stale-revision
+refusals. Cursor gaps in `mission_events` are intentional: raw progress belongs
+to the orchestrator stream, while this log records domain transitions.
+
+These checks exercise real SQL and RLS in PGlite. They do not establish a deployed
+PostgreSQL service, network authentication, or a real executor connection.
+
+`bun run check:types` checks all Missions sources with strict types.
+`bun run test:coverage` writes text and LCOV reports and enforces 95% lines and
+90% functions; the root check runs both. The reports measure the loaded Missions
+modules, not external orchestrators or an installed product.

@@ -170,3 +170,145 @@ describe("mission command service — fail-closed at every layer", () => {
     expect(outcome).toEqual({ ok: false, refusal: "mission.request_invalid" });
   });
 });
+
+describe("mission command service — audit and progress persistence", () => {
+  test("exports a newly proposed mission without inserting another aggregate or event", async () => {
+    const id = "urn:libre-ai:mission:export-new";
+    const created = await run("requester", {
+      command: { ...PROPOSE, id },
+      expectedRevision: 0,
+    });
+    expect(created.ok).toBe(true);
+    const exported = await run("requester", {
+      command: { type: "ExportMissionRecord" },
+      missionId: id,
+      expectedRevision: 1,
+    });
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) throw new Error("authorized export refused");
+    expect(exported.mission.revision).toBe(1);
+    expect(exported.mission.eventCursor).toBe(1);
+    expect(exported.events).toEqual([]);
+    const events = await withTenantDbTransaction(tdb.db, TENANT, (tx) =>
+      tx.query<{ sequence: number }>(
+        "SELECT sequence FROM mission_events WHERE mission_id = $1 ORDER BY sequence",
+        [id],
+      ),
+    );
+    expect(events.rows).toEqual([{ sequence: 1 }]);
+  });
+
+  test("exports an assessed mission at its current revision and refuses a stale export", async () => {
+    const id = "urn:libre-ai:mission:export-assessed";
+    expect((await run("requester", { command: { ...PROPOSE, id }, expectedRevision: 0 })).ok).toBe(
+      true,
+    );
+    expect(
+      (
+        await run("approver", {
+          command: { type: "AssessMissionRisk", level: "low", policyVersion: "1.0.0" },
+          missionId: id,
+          expectedRevision: 1,
+        })
+      ).ok,
+    ).toBe(true);
+    const exported = await run("requester", {
+      command: { type: "ExportMissionRecord" },
+      missionId: id,
+      expectedRevision: 2,
+    });
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) throw new Error("authorized export refused");
+    expect(exported.mission.revision).toBe(2);
+    expect(exported.mission.eventCursor).toBe(2);
+    expect(exported.events).toEqual([]);
+    expect(
+      await run("requester", {
+        command: { type: "ExportMissionRecord" },
+        missionId: id,
+        expectedRevision: 1,
+      }),
+    ).toEqual({ ok: false, refusal: "mission.revision_stale" });
+  });
+
+  test("persists consecutive progress cursors without changing revision and keeps the next transition", async () => {
+    const id = "urn:libre-ai:mission:progress";
+    expect((await run("requester", { command: { ...PROPOSE, id }, expectedRevision: 0 })).ok).toBe(
+      true,
+    );
+    expect(
+      (
+        await run("approver", {
+          command: { type: "AssessMissionRisk", level: "low", policyVersion: "1.0.0" },
+          missionId: id,
+          expectedRevision: 1,
+        })
+      ).ok,
+    ).toBe(true);
+    expect(
+      (
+        await run("approver", {
+          command: {
+            type: "ApproveMission",
+            approval: "urn:libre-ai:approval:progress",
+            humanApproved: true,
+          },
+          missionId: id,
+          expectedRevision: 2,
+        })
+      ).ok,
+    ).toBe(true);
+    expect(
+      (
+        await run("operator", {
+          command: { type: "StartMission" },
+          missionId: id,
+          expectedRevision: 3,
+        })
+      ).ok,
+    ).toBe(true);
+    for (const cursor of [5, 6]) {
+      const outcome = await run("orchestrator", {
+        command: {
+          type: "RecordOrchestratorEvent",
+          orchestratorBound: true,
+          budgetExceeded: false,
+          requiresDecision: false,
+        },
+        missionId: id,
+        expectedRevision: 4,
+      });
+      expect(outcome.ok).toBe(true);
+      if (!outcome.ok) throw new Error("authorized progress refused");
+      expect(outcome.mission.revision).toBe(4);
+      expect(outcome.mission.eventCursor).toBe(cursor);
+      expect(outcome.events).toEqual([]);
+      const stored = await withTenantDbTransaction(tdb.db, TENANT, (tx) => loadMission(tx, id));
+      expect(stored?.revision).toBe(4);
+      expect(stored?.eventCursor).toBe(cursor);
+    }
+    const paused = await run("operator", {
+      command: { type: "PauseMission" },
+      missionId: id,
+      expectedRevision: 4,
+    });
+    expect(paused.ok).toBe(true);
+    if (!paused.ok) throw new Error("authorized pause refused");
+    expect(paused.mission.state).toBe("paused");
+    expect(paused.mission.revision).toBe(5);
+    expect(paused.mission.eventCursor).toBe(7);
+    const events = await withTenantDbTransaction(tdb.db, TENANT, (tx) =>
+      tx.query<{ sequence: number }>(
+        "SELECT sequence FROM mission_events WHERE mission_id = $1 ORDER BY sequence",
+        [id],
+      ),
+    );
+    expect(events.rows).toEqual([
+      { sequence: 1 },
+      { sequence: 2 },
+      { sequence: 3 },
+      { sequence: 4 },
+      { sequence: 7 },
+    ]);
+  });
+});
