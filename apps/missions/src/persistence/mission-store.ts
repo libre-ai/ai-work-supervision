@@ -2,7 +2,7 @@
 // its causal events inside the caller's tenant transaction
 // (packages/data withTenantDbTransaction): the tenant is read from the active
 // context (never the request), and RLS scopes every row. Optimistic
-// concurrency is enforced by the aggregate revision — a stale write updates no
+// concurrency is enforced by revision and event cursor — a stale write updates no
 // row and is rejected, never silently lost.
 
 import { requireTenantContext, type SqlExecutor } from "@libre-ai/data";
@@ -66,17 +66,24 @@ function rowToMission(row: MissionRow): Mission {
   };
 }
 
+export interface MissionPosition {
+  readonly revision: number;
+  readonly eventCursor: number;
+}
+
 /**
  * Persist the next aggregate and append its events, atomically within the
- * caller's tenant transaction. `revision === 1` inserts; otherwise the update
- * is guarded by the previous revision (`revision - 1`) and throws
- * `MissionRevisionConflictError` if it matched no row (a concurrent writer won).
+ * caller's tenant transaction. A null previous position inserts. Updates compare
+ * both the revision and cursor observed before the domain decision: progress
+ * advances the cursor without changing revision. A concurrent writer causes
+ * MissionRevisionConflictError before any event is appended.
  */
 export async function saveMission(
   executor: SqlExecutor,
   mission: Mission,
   events: readonly MissionEvent[],
   recordedAt: string,
+  previous: MissionPosition | null,
 ): Promise<void> {
   const tenantId = requireTenantContext();
   if (mission.tenantId !== tenantId) throw new MissionTenantMismatchError();
@@ -85,7 +92,7 @@ export async function saveMission(
   const result = mission.result === undefined ? null : JSON.stringify(mission.result);
   const verdict = mission.verdict === undefined ? null : JSON.stringify(mission.verdict);
 
-  if (mission.revision === 1) {
+  if (previous === null) {
     await executor.query(
       `INSERT INTO missions (
          tenant_id, id, revision, state, handoff_id, handoff_digest, risk, budgets,
@@ -110,13 +117,13 @@ export async function saveMission(
     );
   } else {
     // tenant_id in the WHERE is defense in depth above FORCE RLS (the USING
-    // clause already scopes the row); the guarded revision is the optimistic
-    // concurrency check.
+    // clause already scopes the row); the observed position prevents a state
+    // transition from overwriting progress at the same revision.
     const updated = await executor.query(
       `UPDATE missions SET
          revision = $1, state = $2, risk = $3, approvals = $4,
          event_cursor = $5, result = $6, verdict = $7
-       WHERE tenant_id = $8 AND id = $9 AND revision = $10`,
+       WHERE tenant_id = $8 AND id = $9 AND revision = $10 AND event_cursor = $11`,
       [
         mission.revision,
         mission.state,
@@ -127,7 +134,8 @@ export async function saveMission(
         verdict,
         tenantId,
         mission.id,
-        mission.revision - 1,
+        previous.revision,
+        previous.eventCursor,
       ],
     );
     if ((updated.affectedRows ?? 0) !== 1) throw new MissionRevisionConflictError(mission.id);

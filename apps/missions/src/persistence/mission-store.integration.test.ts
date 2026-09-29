@@ -3,7 +3,12 @@ import { join } from "node:path";
 import { withTenantDbTransaction } from "@libre-ai/data";
 import { createTestDatabase, type TestDatabase } from "@libre-ai/testing";
 import { type Command, decide, type Mission } from "../domain/mission";
-import { loadMission, MissionRevisionConflictError, saveMission } from "./mission-store";
+import {
+  loadMission,
+  MissionRevisionConflictError,
+  MissionTenantMismatchError,
+  saveMission,
+} from "./mission-store";
 
 // The mission persistence exercised against the real PostgreSQL barrier
 // (PGlite): the tables, FORCE RLS policies and least-privilege grants from
@@ -65,6 +70,29 @@ afterAll(async () => {
 });
 
 describe("mission store round-trip and tenant isolation", () => {
+  test("rejects an aggregate from another organization before writing any row", async () => {
+    const id = "urn:libre-ai:mission:foreign-write";
+    const decision = decide(null, proposeCommand(id), {
+      tenantId: TENANT_A,
+      now: NOW,
+      expectedRevision: 0,
+    });
+    if (!decision.ok) throw new Error("setup refused");
+    await expect(
+      withTenantDbTransaction(tdb.db, TENANT_B, (tx) =>
+        saveMission(tx, decision.next, decision.events, NOW, null),
+      ),
+    ).rejects.toBeInstanceOf(MissionTenantMismatchError);
+    for (const tenant of [TENANT_A, TENANT_B]) {
+      const state = await withTenantDbTransaction(tdb.db, tenant, async (tx) => ({
+        mission: await loadMission(tx, id),
+        events: await tx.query("SELECT sequence FROM mission_events WHERE mission_id = $1", [id]),
+      }));
+      expect(state.mission).toBeNull();
+      expect(state.events.rows).toEqual([]);
+    }
+  });
+
   test("saves a proposed mission and loads it back within the tenant", async () => {
     const decision = decide(null, proposeCommand("urn:libre-ai:mission:rt1"), {
       tenantId: TENANT_A,
@@ -75,7 +103,7 @@ describe("mission store round-trip and tenant isolation", () => {
     if (!decision.ok) return;
 
     const loaded = await withTenantDbTransaction(tdb.db, TENANT_A, async (tx) => {
-      await saveMission(tx, decision.next, decision.events, NOW);
+      await saveMission(tx, decision.next, decision.events, NOW, null);
       return loadMission(tx, "urn:libre-ai:mission:rt1");
     });
     expect(loaded?.state).toBe("proposed");
@@ -91,7 +119,7 @@ describe("mission store round-trip and tenant isolation", () => {
     });
     if (!decision.ok) throw new Error("propose refused");
     await withTenantDbTransaction(tdb.db, TENANT_A, (tx) =>
-      saveMission(tx, decision.next, decision.events, NOW),
+      saveMission(tx, decision.next, decision.events, NOW, null),
     );
 
     const crossTenant = await withTenantDbTransaction(tdb.db, TENANT_B, (tx) =>
@@ -108,7 +136,7 @@ describe("mission store round-trip and tenant isolation", () => {
     });
     if (!decision.ok) throw new Error("propose refused");
     await withTenantDbTransaction(tdb.db, TENANT_A, (tx) =>
-      saveMission(tx, decision.next, decision.events, NOW),
+      saveMission(tx, decision.next, decision.events, NOW, null),
     );
 
     // Tenant B, in raw SQL under the app role, cannot mutate tenant A's row:
@@ -149,19 +177,88 @@ describe("optimistic revision concurrency", () => {
     if (!winner.ok || !loser.ok) throw new Error("assess refused");
 
     await withTenantDbTransaction(tdb.db, TENANT_A, (tx) =>
-      saveMission(tx, proposed, created.events, NOW),
+      saveMission(tx, proposed, created.events, NOW, null),
     );
     // The winner advances revision 1 -> 2.
     await withTenantDbTransaction(tdb.db, TENANT_A, (tx) =>
-      saveMission(tx, winner.next, winner.events, NOW),
+      saveMission(tx, winner.next, winner.events, NOW, proposed),
     );
     // The loser holds the same stale revision-1 aggregate: its guarded update
     // matches no row (current revision is already 2) and is rejected.
     await expect(
       withTenantDbTransaction(tdb.db, TENANT_A, (tx) =>
-        saveMission(tx, loser.next, loser.events, NOW),
+        saveMission(tx, loser.next, loser.events, NOW, proposed),
       ),
     ).rejects.toBeInstanceOf(MissionRevisionConflictError);
+  });
+});
+
+describe("optimistic cursor concurrency", () => {
+  test.each([
+    "progress",
+    "pause",
+  ] as const)("refuses stale %s after same-revision progress without losing the winning cursor", async (staleCommand) => {
+    const id = `urn:libre-ai:mission:cursor-${staleCommand}`;
+    const commands: readonly Command[] = [
+      proposeCommand(id),
+      { type: "AssessMissionRisk", level: "low", policyVersion: "1.0.0" },
+      { type: "ApproveMission", approval: "urn:libre-ai:approval:cursor", humanApproved: true },
+      { type: "StartMission" },
+    ];
+    let previous: Mission | null = null;
+    for (const command of commands) {
+      const decision = decide(previous, command, {
+        tenantId: TENANT_A,
+        now: NOW,
+        expectedRevision: previous?.revision ?? 0,
+      });
+      if (!decision.ok) throw new Error(`setup refused ${decision.refusal}`);
+      const observed = previous;
+      await withTenantDbTransaction(tdb.db, TENANT_A, (tx) =>
+        saveMission(tx, decision.next, decision.events, NOW, observed),
+      );
+      previous = decision.next;
+    }
+    if (previous === null) throw new Error("missing setup mission");
+    const running = previous;
+    const progress: Command = {
+      type: "RecordOrchestratorEvent",
+      orchestratorBound: true,
+      budgetExceeded: false,
+      requiresDecision: false,
+    };
+    const context = { tenantId: TENANT_A, now: NOW, expectedRevision: running.revision };
+    const winner = decide(running, progress, context);
+    const loser = decide(
+      running,
+      staleCommand === "progress" ? progress : { type: "PauseMission" },
+      context,
+    );
+    if (!winner.ok || !loser.ok) throw new Error("race setup refused");
+    await withTenantDbTransaction(tdb.db, TENANT_A, (tx) =>
+      saveMission(tx, winner.next, winner.events, NOW, running),
+    );
+    await expect(
+      withTenantDbTransaction(tdb.db, TENANT_A, (tx) =>
+        saveMission(tx, loser.next, loser.events, NOW, running),
+      ),
+    ).rejects.toBeInstanceOf(MissionRevisionConflictError);
+    const persisted = await withTenantDbTransaction(tdb.db, TENANT_A, async (tx) => ({
+      mission: await loadMission(tx, id),
+      events: await tx.query<{ sequence: number }>(
+        "SELECT sequence FROM mission_events WHERE mission_id = $1 ORDER BY sequence",
+        [id],
+      ),
+    }));
+    expect(persisted.mission?.state).toBe("running");
+    expect(persisted.mission?.revision).toBe(4);
+    expect(persisted.mission?.eventCursor).toBe(5);
+    expect(persisted.events.rows).toEqual([
+      { sequence: 1 },
+      { sequence: 2 },
+      { sequence: 3 },
+      { sequence: 4 },
+    ]);
   });
 });
 
@@ -174,7 +271,7 @@ describe("append-only event log and fail-closed barrier", () => {
     });
     if (!decision.ok) throw new Error("propose refused");
     await withTenantDbTransaction(tdb.db, TENANT_A, (tx) =>
-      saveMission(tx, decision.next, decision.events, NOW),
+      saveMission(tx, decision.next, decision.events, NOW, null),
     );
 
     await asRawTenant(TENANT_A, async () => {

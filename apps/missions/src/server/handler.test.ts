@@ -4,6 +4,19 @@ import { createMissionsHandler } from "./handler";
 const handler = createMissionsHandler(() => "req_0000000000000000");
 
 describe("missions cockpit handler", () => {
+  test("assigns distinct opaque problem identifiers when no generator is injected", async () => {
+    const defaultHandler = createMissionsHandler();
+    const first = await defaultHandler(new Request("https://missions.test/missing"));
+    const second = await defaultHandler(new Request("https://missions.test/missing"));
+    const firstId = (await first.json()).error.requestId;
+    const secondId = (await second.json()).error.requestId;
+    expect(first.status).toBe(404);
+    expect(second.status).toBe(404);
+    expect(firstId).toMatch(/^req_[a-f0-9]{32}$/);
+    expect(secondId).toMatch(/^req_[a-f0-9]{32}$/);
+    expect(firstId).not.toBe(secondId);
+  });
+
   test("serves the server-rendered cockpit at /", async () => {
     const response = await handler(new Request("https://missions.test/"));
     expect(response.status).toBe(200);

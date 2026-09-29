@@ -26,6 +26,8 @@
       },
       "devDependencies": {
         "@libre-ai/testing": "file:../../../application-development-toolkit/packages/testing",
+        "@types/react": "19.2.17",
+        "@types/react-dom": "19.2.3",
       },
     },
     "apps/specifications": {
@@ -203,7 +205,7 @@
 
     "@libre-ai/auth-web/@libre-ai/web-platform": ["@libre-ai/web-platform@file:../application-development-toolkit/packages/web-platform", { "devDependencies": { "@biomejs/biome": "2.5.3", "@libre-ai/governance": "file:../../../project-governance", "@types/bun": "1.3.14", "@types/react": "19.2.17", "@types/react-dom": "19.2.3", "react": "19.2.7", "react-dom": "19.2.7", "typescript": "7.0.2" }, "peerDependencies": { "react": "19.2.7", "react-dom": "19.2.7" } }],
 
-    "@libre-ai/contracts/@libre-ai/governance": ["@libre-ai/governance@file:../project-governance", {}],
+    "@libre-ai/contracts/@libre-ai/governance": ["@libre-ai/governance@file:../project-governance", { "dependencies": { "ajv": "8.20.0", "ajv-formats": "3.0.1", "entities": "8.0.0" }, "devDependencies": { "@biomejs/biome": "2.5.3", "@types/bun": "1.3.14", "typescript": "7.0.2" } }],
 
     "@libre-ai/contracts-authority/@libre-ai/governance": ["@libre-ai/governance@file:../project-governance", {}],
 
@@ -225,7 +227,7 @@
 
     "@libre-ai/web-platform/@libre-ai/governance": ["@libre-ai/governance@file:../project-governance", {}],
 
-    "@libre-ai/auth-web/@libre-ai/contracts/@libre-ai/governance": ["@libre-ai/governance@file:../project-governance", {}],
+    "@libre-ai/auth-web/@libre-ai/contracts/@libre-ai/governance": ["@libre-ai/governance@file:../project-governance", { "dependencies": { "ajv": "8.20.0", "ajv-formats": "3.0.1", "entities": "8.0.0" }, "devDependencies": { "@biomejs/biome": "2.5.3", "@types/bun": "1.3.14", "typescript": "7.0.2" } }],
 
     "@libre-ai/auth-web/@libre-ai/web-platform/@libre-ai/governance": ["@libre-ai/governance@file:../project-governance", {}],
 

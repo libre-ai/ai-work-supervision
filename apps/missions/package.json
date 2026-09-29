@@ -10,7 +10,11 @@
   "scripts": {
     "check:bun": "bun ../../node_modules/@libre-ai/governance/tools/quality/check-bun-minimum.ts",
     "pretest": "bun run check:bun",
-    "test": "bun test"
+    "test": "bun test",
+    "check:types": "tsc --noEmit -p tsconfig.json",
+    "test:coverage": "bun test --coverage",
+    "precheck:types": "bun run check:bun",
+    "pretest:coverage": "bun run check:bun"
   },
   "dependencies": {
     "@libre-ai/data": "file:../../../organization-data-lifecycle/packages/data",
@@ -20,6 +24,8 @@
     "@libre-ai/contracts-authority": "file:../../../schemas-and-contracts"
   },
   "devDependencies": {
-    "@libre-ai/testing": "file:../../../application-development-toolkit/packages/testing"
+    "@libre-ai/testing": "file:../../../application-development-toolkit/packages/testing",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3"
   }
 }

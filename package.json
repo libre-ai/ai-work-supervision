@@ -40,8 +40,10 @@
     "lint": "bun run check:bun:runtime && biome ci .",
     "pretest": "bun run check:bun",
     "test": "bun run check:app",
-    "check": "bun run check:bun && bun run check:toolchain && bun run check:app && bun run check:secret-scan && bun run check:personal-data && bun run check:specifications && bun run lint",
-    "check:specifications": "bun run check:bun:runtime && bun node_modules/@libre-ai/governance/tools/quality/check-specification-lock.ts --apps missions agent-board"
+    "check": "bun run check:bun && bun run check:toolchain && bun run check:app && bun run check:secret-scan && bun run check:personal-data && bun run check:specifications && bun run check:mission-types && bun run check:mission-coverage && bun run lint",
+    "check:specifications": "bun run check:bun:runtime && bun node_modules/@libre-ai/governance/tools/quality/check-specification-lock.ts --apps missions agent-board",
+    "check:mission-types": "bun run check:bun:runtime && bun run --cwd apps/missions check:types",
+    "check:mission-coverage": "bun run check:bun:runtime && bun run --cwd apps/missions test:coverage"
   },
   "workspaces": [
     "apps/missions",
