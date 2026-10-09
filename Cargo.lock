@@ -579,6 +579,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "work-supervision-worktree"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "tempfile",
+ "work-supervision-domain",
+ "work-supervision-journal",
+ "work-supervision-store",
+]
+
+[[package]]
 name = "zmij"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"

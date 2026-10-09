@@ -10,6 +10,7 @@ members = [
   "crates/work-supervision-journal-verifier",
   "crates/work-supervision-pty",
   "crates/work-supervision-store",
+  "crates/work-supervision-worktree",
 ]
 
 [workspace.package]

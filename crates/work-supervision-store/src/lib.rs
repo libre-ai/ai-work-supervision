@@ -324,6 +324,37 @@ impl Store {
         schema::describe(&self.connection)
     }
 
+    /// The worktree row of mission `mission` (32 hex characters), if any.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::Sqlite`].
+    pub fn worktree(&self, mission: &str) -> Result<Option<WorktreeRow>, StoreError> {
+        Ok(self
+            .connection
+            .query_row(
+                &format!("SELECT {WORKTREE_COLUMNS} FROM worktrees WHERE mission_id = ?1"),
+                [mission],
+                WorktreeRow::read,
+            )
+            .optional()?)
+    }
+
+    /// Every worktree row, by mission identifier.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::Sqlite`].
+    pub fn worktrees(&self) -> Result<Vec<WorktreeRow>, StoreError> {
+        let mut statement = self.connection.prepare(&format!(
+            "SELECT {WORKTREE_COLUMNS} FROM worktrees ORDER BY mission_id"
+        ))?;
+        let rows = statement
+            .query_map([], WorktreeRow::read)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
     /// The underlying connection, for read queries of the crates built on the projection.
     #[must_use]
     pub const fn connection(&self) -> &Connection {
@@ -365,4 +396,46 @@ fn remove_database(path: &Path) -> Result<(), StoreError> {
         }
     }
     Ok(())
+}
+
+const WORKTREE_COLUMNS: &str =
+    "mission_id, repository, path, branch, base_commit, state, head, delete_branch, archive_digest";
+
+/// A projected worktree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorktreeRow {
+    /// Mission identifier.
+    pub mission: String,
+    /// Repository name from the private configuration.
+    pub repository: String,
+    /// Path relative to the root.
+    pub path: String,
+    /// Branch.
+    pub branch: String,
+    /// Base commit.
+    pub base_commit: String,
+    /// `creating`, `created`, `aborted`, `releasing` or `removed`.
+    pub state: String,
+    /// HEAD observed at creation.
+    pub head: Option<String>,
+    /// Whether the release deletes the branch (known once released).
+    pub delete_branch: Option<bool>,
+    /// Digest of the archived diff, when one was archived.
+    pub archive_digest: Option<String>,
+}
+
+impl WorktreeRow {
+    fn read(row: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
+        Ok(Self {
+            mission: row.get(0)?,
+            repository: row.get(1)?,
+            path: row.get(2)?,
+            branch: row.get(3)?,
+            base_commit: row.get(4)?,
+            state: row.get(5)?,
+            head: row.get(6)?,
+            delete_branch: row.get::<_, Option<i64>>(7)?.map(|flag| flag != 0),
+            archive_digest: row.get(8)?,
+        })
+    }
 }

@@ -40,12 +40,26 @@ silently half-read.
 | `mission.cancelled` | `cancelled` | `reason_digest` |
 | `mission.noted` | unchanged, no revision | `note_digest` |
 
+## Worktree events
+
+| Kind | Worktree state after | Data besides `mission` |
+| --- | --- | --- |
+| `worktree.create.intent` | `creating` (first intent, or after `aborted`) | `repository`, `path` (`worktrees/<mission>`), `branch` (`ws/<mission>`), `base_commit` |
+| `worktree.created` | `created` (from `creating`) | `head` (observed) |
+| `worktree.create.aborted` | `aborted` (from `creating`) | — |
+| `worktree.remove.intent` | `releasing` (from `created`) | `delete_branch` (boolean) |
+| `worktree.archived` | unchanged (`releasing`) | `archive_digest` (evidence blob), `archive_bytes` |
+| `worktree.removed` | `removed` (from `releasing`) | — |
+
+A step from any other state is refused (`projection.event_invalid`). Projected
+in table `worktrees` (migration 0002). Lifecycle: `worktree-v0.md`.
+
 `journal.recovered` (written by the journal itself after a torn tail is
 quarantined) changes nothing in the projection.
 
 ## Projection
 
-- Tables: `missions`, `mission_criteria`, `mission_notes`,
+- Tables: `missions`, `mission_criteria`, `mission_notes`, `worktrees`,
   `projection_position`. Migrations: `crates/work-supervision-store/migrations/`
   (`sqlite/` and `postgres/`, same numbers), both checked against
   `migrations/schema.v0.json` — SQLite by the crate's tests, PostgreSQL in

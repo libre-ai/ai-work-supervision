@@ -164,7 +164,7 @@ impl Supervisor {
     pub fn open(layout: &Layout, mode: OpenMode) -> Result<Self, SupervisorError> {
         let journal_dir = layout.root().join("journal");
         std::fs::create_dir_all(&journal_dir).map_err(|_| JournalError::Io)?;
-        let (journal, _) = Journal::open(&layout.journal(), mode)?;
+        let (journal, _) = open_journal(&layout.journal(), &mode)?;
         let blobs = layout.blob_store()?;
         let mut store = Store::open(&layout.state())?;
         store.catch_up(&journal, &blobs)?;
@@ -253,6 +253,30 @@ impl Supervisor {
     #[must_use]
     pub const fn blobs(&self) -> &BlobStore {
         &self.blobs
+    }
+}
+
+/// How long `open` waits for a journal lock held only transiently.
+///
+/// `flock` locks belong to the open file description: a child forked by any
+/// thread of a previous holder (to run git or an executor) shares it until its
+/// `exec` closes the descriptor, so a lock can outlive its owner by the
+/// duration of a fork. A writer that is really alive keeps it far longer than
+/// this bound and is still refused with `locked`.
+const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
+
+fn open_journal(
+    path: &Path,
+    mode: &OpenMode,
+) -> Result<(Journal, Option<work_supervision_journal::Recovery>), JournalError> {
+    let deadline = std::time::Instant::now() + LOCK_WAIT;
+    loop {
+        match Journal::open(path, mode.clone()) {
+            Err(JournalError::Locked) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            outcome => return outcome,
+        }
     }
 }
 
