@@ -96,12 +96,20 @@ to events with `pi.on(…)` and can run a program with `pi.exec(…)`. The bridg
 contract for Pi is a payload `{"event": <Pi event name>, "session_id": …,
 "cwd": …}` sent to `ws hook pi` on standard input, with the events
 `session_start`, `agent_start`, `agent_settled` (no automatic continuation
-left: the agent waits for its user) and `session_shutdown`. The extension that
-sends it is **not part of this repository**: it is to be written against the
-Pi extension API of the installed version and reviewed like any code that
-runs in the harness. Pi includes no sandbox and no approval mechanism; on
-this machine its RPC mode is reserved to the gondolin launcher, which is the
-confinement C0 qualifies.
+left: the agent waits for its user) and `session_shutdown`, passed as the last
+argument (`pi.exec` has no standard input).
+
+The extension is `adapters/pi/ws-bridge.ts`: load it with `pi -e
+adapters/pi/ws-bridge.ts` or from `~/.pi/agent/extensions/`, with `WS_ROOT`
+set (and `WS_BIN` when `ws` is not on `PATH`); without `WS_ROOT` it does
+nothing, and a report that fails or hangs (bounded to 5 s) never fails the
+session. Its tests (`bun run check:adapters`) drive it with a fake `pi` and,
+end to end, against the real `ws` and `wsd`. It is typed against the subset of
+the API it uses; on 2026-10-09 that subset was checked to accept the
+`ExtensionAPI` of Pi 0.84.2 with TypeScript 7.0.2 (a misuse of the same types
+was refused by the same check). It has not been run inside Pi. Pi includes no
+sandbox and no approval mechanism; on this machine its RPC mode is reserved to
+the gondolin launcher, which is the confinement C0 qualifies.
 
 ## 2. The executor adapter contract (after C0)
 
