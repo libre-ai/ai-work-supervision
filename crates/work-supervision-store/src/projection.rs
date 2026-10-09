@@ -13,24 +13,33 @@ use work_supervision_journal::{Digest, Entry};
 
 use crate::{BlobStore, StoreError};
 
-struct Fields<'a> {
-    data: &'a Map<String, Value>,
-    seq: u64,
+pub(crate) struct Fields<'a> {
+    pub(crate) data: &'a Map<String, Value>,
+    pub(crate) seq: u64,
 }
 
 impl<'a> Fields<'a> {
-    const fn invalid(&self) -> StoreError {
+    pub(crate) const fn invalid(&self) -> StoreError {
         StoreError::EventInvalid { seq: self.seq }
     }
 
-    fn string(&self, key: &str) -> Result<&'a str, StoreError> {
+    pub(crate) fn string(&self, key: &str) -> Result<&'a str, StoreError> {
         self.data
             .get(key)
             .and_then(Value::as_str)
             .ok_or_else(|| self.invalid())
     }
 
-    fn integer(&self, key: &str) -> Result<i64, StoreError> {
+    /// A key that must be present, holding a string or `null`.
+    pub(crate) fn optional_string(&self, key: &str) -> Result<Option<&'a str>, StoreError> {
+        match self.data.get(key) {
+            Some(Value::Null) => Ok(None),
+            Some(Value::String(text)) => Ok(Some(text)),
+            _ => Err(self.invalid()),
+        }
+    }
+
+    pub(crate) fn integer(&self, key: &str) -> Result<i64, StoreError> {
         self.data
             .get(key)
             .and_then(Value::as_i64)
@@ -38,15 +47,29 @@ impl<'a> Fields<'a> {
             .ok_or_else(|| self.invalid())
     }
 
-    fn boolean(&self, key: &str) -> Result<bool, StoreError> {
+    /// A key that must be present, holding an integer (of any sign) or `null`.
+    pub(crate) fn optional_integer(&self, key: &str) -> Result<Option<i64>, StoreError> {
+        match self.data.get(key) {
+            Some(Value::Null) => Ok(None),
+            Some(value) => value.as_i64().map(Some).ok_or_else(|| self.invalid()),
+            None => Err(self.invalid()),
+        }
+    }
+
+    pub(crate) fn boolean(&self, key: &str) -> Result<bool, StoreError> {
         self.data
             .get(key)
             .and_then(Value::as_bool)
             .ok_or_else(|| self.invalid())
     }
 
-    fn mission(&self) -> Result<&'a str, StoreError> {
-        let id = self.string("mission")?;
+    pub(crate) fn mission(&self) -> Result<&'a str, StoreError> {
+        self.identifier("mission")
+    }
+
+    /// A 32-character lowercase hexadecimal identifier.
+    pub(crate) fn identifier(&self, key: &str) -> Result<&'a str, StoreError> {
+        let id = self.string(key)?;
         if is_lower_hex(id, 32) {
             Ok(id)
         } else {
@@ -54,11 +77,19 @@ impl<'a> Fields<'a> {
         }
     }
 
-    fn digest(&self, key: &str) -> Result<Digest, StoreError> {
+    /// An identifier or `null`.
+    pub(crate) fn optional_identifier(&self, key: &str) -> Result<Option<&'a str>, StoreError> {
+        match self.optional_string(key)? {
+            Some(id) if !is_lower_hex(id, 32) => Err(self.invalid()),
+            other => Ok(other),
+        }
+    }
+
+    pub(crate) fn digest(&self, key: &str) -> Result<Digest, StoreError> {
         Digest::from_hex(self.string(key)?).ok_or_else(|| self.invalid())
     }
 
-    fn commit(&self, key: &str) -> Result<&'a str, StoreError> {
+    pub(crate) fn commit(&self, key: &str) -> Result<&'a str, StoreError> {
         let commit = self.string(key)?;
         if is_lower_hex(commit, 40) || is_lower_hex(commit, 64) {
             Ok(commit)
@@ -67,8 +98,25 @@ impl<'a> Fields<'a> {
         }
     }
 
+    /// The text a digest field names, or `None` when the field is `null`.
+    pub(crate) fn optional_text(
+        &self,
+        key: &str,
+        blobs: &BlobStore,
+    ) -> Result<Option<(String, String)>, StoreError> {
+        match self.data.get(key) {
+            Some(Value::Null) => Ok(None),
+            Some(_) => self.text(key, blobs).map(Some),
+            None => Err(self.invalid()),
+        }
+    }
+
     /// Reads the text a digest field names; a missing blob is its own refusal.
-    fn text(&self, key: &str, blobs: &BlobStore) -> Result<(String, String), StoreError> {
+    pub(crate) fn text(
+        &self,
+        key: &str,
+        blobs: &BlobStore,
+    ) -> Result<(String, String), StoreError> {
         let digest = self.digest(key)?;
         match blobs.get_text(&digest) {
             Ok(text) => Ok((text, digest.to_hex())),
@@ -100,7 +148,8 @@ pub(crate) fn apply(
     };
     let seq_value = i64::try_from(seq).map_err(|_| fields.invalid())?;
     let at = entry.at().as_str();
-    match entry.event().kind() {
+    let kind = entry.event().kind();
+    match kind {
         "journal.recovered" => Ok(()),
         "mission.created" => created(transaction, &fields, blobs, seq_value, at),
         "mission.noted" => {
@@ -119,8 +168,48 @@ pub(crate) fn apply(
         }
         kind if kind.starts_with("worktree.") => worktree(transaction, kind, &fields, seq_value),
         kind if kind.starts_with("run.") => run(transaction, kind, &fields, seq_value),
+        kind if kind.starts_with("idea.") => {
+            crate::coordination::idea(transaction, kind, &fields, blobs, seq_value, at)
+        }
+        kind if kind.starts_with("request.") => {
+            crate::coordination::request(transaction, kind, &fields, blobs, seq_value, at)
+        }
+        kind if kind.starts_with("session.") => {
+            crate::coordination::session(transaction, kind, &fields, blobs, seq_value, at)
+        }
+        kind if kind.starts_with("dependency.")
+            || kind.starts_with("scope.")
+            || kind.starts_with("check.") =>
+        {
+            crate::coordination::contract(transaction, kind, &fields, blobs, seq_value)
+        }
         kind => transition(transaction, kind, &fields, blobs, seq_value, at),
-    }
+    }?;
+    timeline(transaction, &fields, kind, seq_value, at)
+}
+
+/// Records the entry in the timeline of the mission it names, if that mission exists.
+fn timeline(
+    transaction: &Transaction<'_>,
+    fields: &Fields<'_>,
+    kind: &str,
+    seq: i64,
+    at: &str,
+) -> Result<(), StoreError> {
+    let Some(mission) = fields
+        .data
+        .get("mission")
+        .and_then(Value::as_str)
+        .filter(|id| is_lower_hex(id, 32))
+    else {
+        return Ok(());
+    };
+    transaction.execute(
+        "INSERT INTO mission_events (seq, mission_id, kind, at)
+         SELECT ?1, id, ?3, ?4 FROM missions WHERE id = ?2",
+        params![seq, mission, kind, at],
+    )?;
+    Ok(())
 }
 
 fn created(
