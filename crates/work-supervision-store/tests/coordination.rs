@@ -323,6 +323,10 @@ fn every_primitive_is_projected_as_the_domain_decided() {
     let scope = store.scope(&second).unwrap().unwrap();
     assert_eq!(scope[0].as_str(), "src/cache");
     assert!(store.scope(&first).unwrap().is_none());
+    // The one-query form agrees with the per-mission one.
+    let scopes = store.scopes().unwrap();
+    assert_eq!(scopes.len(), 1);
+    assert_eq!(scopes.get(second.as_str()), Some(&scope));
     let checks = store.criterion_checks(&second).unwrap();
     assert_eq!((checks[0].criterion, checks[0].argv.len()), (0, 2));
     let outcomes = store.check_outcomes(&second).unwrap();

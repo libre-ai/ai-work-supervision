@@ -139,10 +139,11 @@ scope check that fails never undoes a journalled submission (the response
 carries `scope_check_failed`) and never stops a restart (`ws doctor` counts
 `scope_checks_failed`); a declared scope then blocks with `scope.unchecked`.
 
-Known limit: `mission.list` computes the blockers of every mission, and a
-scope conflict compares a mission with every other one, under the daemon's
-lock — quadratic in the number of missions, acceptable for a single-user
-root, to revisit before the multi-tenant phase.
+Cost: a request reads once the missions holding a worktree and every declared
+scope (two queries), then compares in memory; `mission.list` shares that read
+across all missions. The comparison itself stays proportional to missions ×
+worktree holders, under the daemon's lock — to revisit before the
+multi-tenant phase.
 
 ## Checks — verified criteria
 
