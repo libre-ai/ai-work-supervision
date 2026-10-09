@@ -1,0 +1,31 @@
+[package]
+name = "work-supervision-daemon"
+description = "wsd, the Work Supervision v0 daemon: holds the PTYs, applies commands, Unix socket 0600 with peer UID check, crash recovery."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "wsd"
+path = "src/main.rs"
+
+[dependencies]
+nix.workspace = true
+rustix.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+work-supervision-domain = { path = "../work-supervision-domain" }
+work-supervision-journal = { path = "../work-supervision-journal" }
+work-supervision-journal-verifier = { path = "../work-supervision-journal-verifier" }
+work-supervision-pty = { path = "../work-supervision-pty" }
+work-supervision-store = { path = "../work-supervision-store" }
+work-supervision-worktree = { path = "../work-supervision-worktree" }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

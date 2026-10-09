@@ -1,0 +1,25 @@
+[package]
+name = "work-supervision-cli"
+description = "ws, the command line of Work Supervision v0 (client of wsd)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "ws"
+path = "src/main.rs"
+
+[dependencies]
+serde_json.workspace = true
+work-supervision-daemon = { path = "../work-supervision-daemon" }
+work-supervision-journal-verifier = { path = "../work-supervision-journal-verifier" }
+work-supervision-store = { path = "../work-supervision-store" }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

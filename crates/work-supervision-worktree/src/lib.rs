@@ -378,8 +378,36 @@ impl Worktrees {
         Self { layout, git }
     }
 
-    fn path_of(&self, mission: &str) -> PathBuf {
+    /// Absolute path of the worktree of `mission`.
+    #[must_use]
+    pub fn path_of(&self, mission: &str) -> PathBuf {
         self.layout.worktrees().join(mission)
+    }
+
+    /// The commit `HEAD` of `repository` points at (the base of a new worktree).
+    ///
+    /// # Errors
+    ///
+    /// [`WorktreeError::Git`].
+    pub fn head_of(&self, repository: &Path) -> Result<CommitId, WorktreeError> {
+        let head = self
+            .git
+            .commit_of(repository, "HEAD")?
+            .ok_or(WorktreeError::Git)?;
+        CommitId::parse(&head).map_err(|_| WorktreeError::Git)
+    }
+
+    /// Whether the worktree of `mission` has neither changes nor untracked files.
+    ///
+    /// # Errors
+    ///
+    /// [`WorktreeError::Git`].
+    pub fn is_clean(&self, mission: &MissionId) -> Result<bool, WorktreeError> {
+        let status = self.git.run(
+            &self.path_of(mission.as_str()),
+            &["status", "--porcelain", "--untracked-files=all"],
+        )?;
+        Ok(status.is_empty())
     }
 
     /// Creates the worktree of `mission` on `ws/<mission>` at `base` in `repository`.

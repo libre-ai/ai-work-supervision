@@ -4,6 +4,8 @@
 [workspace]
 resolver = "3"
 members = [
+  "crates/work-supervision-cli",
+  "crates/work-supervision-daemon",
   "crates/work-supervision-domain",
   "crates/work-supervision-fake-agent",
   "crates/work-supervision-journal",
@@ -22,6 +24,7 @@ repository = "https://github.com/libre-ai/ai-work-supervision"
 publish = false
 
 [workspace.dependencies]
+nix = { version = "=0.28.0", default-features = false, features = ["socket", "user"] }
 portable-pty = { version = "=0.9.0", default-features = false }
 rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled"] }
 serde = { version = "=1.0.229", default-features = false, features = ["std"] }

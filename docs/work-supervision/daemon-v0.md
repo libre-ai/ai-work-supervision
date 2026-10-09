@@ -1,0 +1,67 @@
+# Work Supervision v0 — `wsd` and `ws`
+
+Crates: `crates/work-supervision-daemon` (`wsd`, protocol client) and
+`crates/work-supervision-cli` (`ws`).
+
+## Root
+
+`ws init --root <dir>` creates the root (mode 0700): `journal/`, `blobs/`,
+`evidence/`, `worktrees/`, `runs/`, `run/` and a `config.toml` template (mode
+0600). The root is always a parameter (`--root` or `WS_ROOT`); a relative path,
+an existing path or a path inside a git working tree is refused
+(`root.not_absolute`, `root.exists`, `root.inside_repository`).
+
+`config.toml` is private and lives only in the root; it is read with a strict
+TOML subset (`crates/work-supervision-daemon/src/config.rs`). A profile other
+than `fake` stops the daemon before anything else
+(`agent.real_forbidden_until_c0`).
+
+## Daemon
+
+`wsd --root <dir>` is the single writer of the root. Startup order (plan §2.7):
+
+1. the journal is verified by the independent verifier (an invalid journal stops the start);
+2. the writer opens it, quarantining a torn tail (`journal.recovered`);
+3. the projection catches up;
+4. unconfirmed worktree intents are reconciled;
+5. runs still `running` are recorded `run.interrupted`; a mission still running
+   leaves with `exit-run` (interrupted unless its run had exited); a ready
+   mission whose worktree was created is provisioned; a terminal mission whose
+   worktree remains is released (kept if accepted, archived otherwise).
+
+Counts are written to standard error; no title, brief, criterion, note,
+summary, reason or terminal output ever is.
+
+Socket `run/wsd.sock`: mode 0600, in a 0700 directory, peer effective UID read
+from the kernel (`SO_PEERCRED` on Linux, `getpeereid` on macOS) and compared
+with the daemon's (`socket.peer_refused`). No network port is opened. Threads,
+not an async runtime: one per connection and one per run, behind one lock.
+
+Protocol: one JSON object per line, at most 4 MiB; responses
+`{"data": …, "meta": {"op": …}}` or `{"error": {"code": …}}`.
+
+## Mission flow
+
+`mission.new` → `mission.ready` → `run` (on a ready mission: worktree at the
+repository HEAD, then `mission.provisioned`; then `run-started` and a PTY with
+the fake agent playing the brief) → idle output → `waiting-input`, `send` →
+`running` → `run.exited` and `exited` → `result.submit` (commit = worktree
+HEAD; the evidence file is stored by `ws` in `evidence/`) → `decide` accept
+(refused while the worktree has changes), reject (worktree kept, `run` resumes),
+abandon, cancel (stops the run first).
+
+## Crash injection
+
+In debug builds only, `WSD_FAULT=<point>` makes the daemon `SIGKILL` itself at
+one of 14 points (`FAULT_POINTS`). The recovery test runs a mission to each
+point, restarts the daemon and finishes the mission: the verifier is green, the
+projection equals its reconstruction, no worktree is orphaned and the accepted
+branch holds the result.
+
+## `ws`
+
+Commands are listed in `crates/work-supervision-cli/src/main.rs`. `ws journal
+verify` exits 0 / 1 / 2 / 3 like `ws-journal-verify`. `ws rebuild [--check]`
+refuses while the daemon runs (`daemon.running`), rebuilds the projection from
+the journal and the blobs, reports whether it equals the live one, and (without
+`--check`) replaces it, keeping the previous one as `state.sqlite.previous`.
