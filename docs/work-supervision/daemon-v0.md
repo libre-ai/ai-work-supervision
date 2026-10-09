@@ -65,3 +65,14 @@ verify` exits 0 / 1 / 2 / 3 like `ws-journal-verify`. `ws rebuild [--check]`
 refuses while the daemon runs (`daemon.running`), rebuilds the projection from
 the journal and the blobs, reports whether it equals the live one, and (without
 `--check`) replaces it, keeping the previous one as `state.sqlite.previous`.
+
+## `ws attach` (terminal interface)
+
+`ratatui` 0.30.2 with its crossterm backend; the mission's terminal is replayed
+from `runs/<run>/pty.log` through the `vt100` 0.16.2 emulator (VT choice of
+the plan: MIT, like `ratatui`). Panels: mission list, terminal of the selected
+mission, decision bar. Keys — list: `↑`/`↓` select, `r` ready, `g` run, `⏎`
+attach, `u` result (evidence file, then summary), `a` accept, `x` reject,
+`d` abandon, `c` cancel (each asks for a reason), `q` quit; attached: typed
+text is sent with `⏎`, `Esc` returns to the list. A refusal is shown by its
+code. The interface only sends requests to `wsd`; it never writes the journal.

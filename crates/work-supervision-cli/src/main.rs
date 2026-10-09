@@ -9,6 +9,7 @@
 //!                [--max-duration <seconds>] [--max-output <bytes>]
 //! ws mission list | show <id> | ready <id>
 //! ws run <id>
+//! ws attach <id>                    (terminal interface)
 //! ws send <id> <text>                 (a newline is appended)
 //! ws wait <id> <state>… [--timeout-ms <n>]
 //! ws result submit <id> --evidence <file> --summary <s>
@@ -42,6 +43,7 @@ enum Exit {
 
 fn main() -> ExitCode {
     match run(std::env::args_os().skip(1).collect()) {
+        Ok(Value::Null) => ExitCode::SUCCESS,
         Ok(value) => {
             match serde_json::to_string_pretty(&value) {
                 Ok(text) => println!("{text}"),
@@ -89,6 +91,10 @@ fn run(arguments: Vec<OsString>) -> Result<Value, Exit> {
         .ok_or(Exit::Usage)?;
     let layout = Layout::new(&root);
     match words.as_slice() {
+        ["attach", id] => {
+            work_supervision_cli::tui::run(&root, Some((*id).to_owned())).map_err(Exit::Refused)?;
+            Ok(Value::Null)
+        }
         ["journal", "verify"] => journal(&layout, false),
         ["journal", "head"] => journal(&layout, true),
         ["rebuild"] => rebuild(&layout, false),
