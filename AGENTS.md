@@ -15,6 +15,11 @@ status" section is generated from it — never edit that section by hand.
 - Shared UI, web platform and testing bricks live in
   `libre-ai/application-development-toolkit`; data lifecycle bricks live in
   `libre-ai/organization-data-lifecycle`.
+- The Work Supervision v0 native core lives in `crates/` (Cargo workspace at
+  the root, single user, no tenant: ADR-0042 §5). Its journal format is
+  specified in `docs/work-supervision/journal-v0.md`; the writer and the
+  verifier crates must never share code. No executor other than the fake
+  agent may be added before the C0 confinement qualification is green.
 - Recovered code (`apps/missions`, `apps/specifications`,
   `packages/auth-web`) is not product qualification: admission criteria are
   in the card, not in historical documents.
