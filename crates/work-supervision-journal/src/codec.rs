@@ -1,7 +1,7 @@
 use serde_json::{Map, Value};
 
 use crate::event::{check_value, is_valid_kind};
-use crate::{Digest, Event, JournalError, MAX_LINE_BYTES, SCHEMA, Timestamp};
+use crate::{Digest, Entry, Event, JournalError, MAX_LINE_BYTES, SCHEMA, Timestamp};
 
 /// Envelope keys of a v0 entry, in canonical (sorted) order.
 const ENVELOPE_KEYS: [&str; 6] = ["at", "digest", "event", "prev", "schema", "seq"];
@@ -102,6 +102,15 @@ pub(crate) fn decode_line(
     line: u64,
     previous: Option<&Head>,
 ) -> Result<Head, JournalError> {
+    decode_entry(bytes, line, previous).map(|entry| entry.head())
+}
+
+/// Decodes and verifies one line, returning the whole entry.
+pub(crate) fn decode_entry(
+    bytes: &[u8],
+    line: u64,
+    previous: Option<&Head>,
+) -> Result<Entry, JournalError> {
     if bytes.len() > MAX_LINE_BYTES {
         return Err(JournalError::LineTooLong { line });
     }
@@ -155,8 +164,8 @@ pub(crate) fn decode_line(
         .get("at")
         .and_then(Value::as_str)
         .ok_or(JournalError::EnvelopeInvalid { line })?;
-    Timestamp::parse(at).map_err(|error| error.at_line(line))?;
-    check_event(fields.get("event"), line)?;
+    let at = Timestamp::parse(at).map_err(|error| error.at_line(line))?;
+    let event = check_event(fields.get("event"), line)?;
 
     let recorded = match fields.remove("digest") {
         Some(Value::String(text)) => {
@@ -168,21 +177,30 @@ pub(crate) fn decode_line(
     if computed != recorded {
         return Err(JournalError::DigestMismatch { line });
     }
-    Ok(Head {
-        seq,
-        digest: recorded,
-    })
+    Ok(Entry::new(
+        Head {
+            seq,
+            digest: recorded,
+        },
+        at,
+        event,
+    ))
 }
 
-fn check_event(event: Option<&Value>, line: u64) -> Result<(), JournalError> {
+fn check_event(event: Option<&Value>, line: u64) -> Result<Event, JournalError> {
     let Some(Value::Object(event)) = event else {
         return Err(JournalError::EnvelopeInvalid { line });
     };
-    if !has_exactly(event, &EVENT_KEYS) || !matches!(event.get("data"), Some(Value::Object(_))) {
+    if !has_exactly(event, &EVENT_KEYS) {
         return Err(JournalError::EnvelopeInvalid { line });
     }
+    let Some(Value::Object(data)) = event.get("data") else {
+        return Err(JournalError::EnvelopeInvalid { line });
+    };
     match event.get("kind") {
-        Some(Value::String(kind)) if is_valid_kind(kind) => Ok(()),
+        Some(Value::String(kind)) if is_valid_kind(kind) => {
+            Event::new(kind, data.clone()).map_err(|error| error.at_line(line))
+        }
         Some(Value::String(_)) => Err(JournalError::KindInvalid { line }),
         _ => Err(JournalError::EnvelopeInvalid { line }),
     }
