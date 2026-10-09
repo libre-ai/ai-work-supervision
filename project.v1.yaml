@@ -31,8 +31,16 @@ freshness:
   last_verified_on: "2026-10-07"
 scope_stability: "unstable"
 phases:
+  - id: "v0"
+    title: "Single-user v0 native core"
+    note: "ADR-0042 §5: single user, no tenant, SQLite projection of a hash-chained journal. A run with the fake agent is a simulation and does not count toward the criterion."
+    exit_criteria:
+      - id: "b-prime"
+        text: "Run 10 consecutive missions end to end in Work Supervision with a real agent, behind the C0 confinement qualification, without any handoff file in notes/; the journal verifier is green and no worktree is left orphaned after the tenth."
+        weight: 1
+        status: "pending"
   - id: "admission"
-    title: "Bounded capability admission"
+    title: "Bounded capability admission (v1 multi-tenant server)"
     note: "Recovered code is present. Documentary checks do not accept product qualification criteria."
     exit_criteria:
       - id: "qualified-scope"

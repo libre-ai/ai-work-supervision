@@ -23,6 +23,8 @@ status" section is generated from it — never edit that section by hand.
 - Recovered code (`apps/missions`, `apps/specifications`,
   `packages/auth-web`) is not product qualification: admission criteria are
   in the card, not in historical documents.
+- `apps/missions` is frozen as the reference of the multi-tenant model (V6)
+  and has no authority over the v0 state (`apps/missions/AGENTS.md`).
 
 ## Quality gates
 
