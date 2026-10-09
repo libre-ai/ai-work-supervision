@@ -39,6 +39,7 @@ mod blob;
 mod error;
 mod projection;
 mod schema;
+mod supervisor;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -50,6 +51,7 @@ use work_supervision_journal::{Digest, Entry, Head, Journal, replay};
 
 pub use blob::BlobStore;
 pub use error::StoreError;
+pub use supervisor::{Layout, Supervisor, SupervisorError};
 
 /// Last journal entry applied to a projection: its sequence number and digest.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

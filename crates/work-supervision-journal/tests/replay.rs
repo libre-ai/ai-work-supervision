@@ -143,3 +143,23 @@ fn an_open_writer_replays_entries_after_a_sequence_number_while_holding_its_lock
         .unwrap();
     assert_eq!(none, 0);
 }
+
+#[test]
+fn append_entry_returns_the_entry_replay_reads_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("journal.v0.jsonl");
+    let (mut journal, _) = Journal::open(&path, OpenMode::Strict).unwrap();
+    let appended = journal
+        .append_entry(
+            ts("2026-10-09T00:00:01.000Z"),
+            event("mission.noted", json!({ "n": 1 })),
+        )
+        .unwrap();
+    let mut read = Vec::new();
+    replay(&path, |entry| {
+        read.push(entry);
+        Ok::<(), JournalError>(())
+    })
+    .unwrap();
+    assert_eq!(read, vec![appended]);
+}

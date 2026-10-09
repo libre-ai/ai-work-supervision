@@ -201,6 +201,20 @@ impl Journal {
         crate::entry::replay_file(&file, after, visit)
     }
 
+    /// As [`Journal::append`], returning the whole entry once it is durable.
+    ///
+    /// # Errors
+    ///
+    /// As [`Journal::append`].
+    pub fn append_entry(
+        &mut self,
+        at: Timestamp,
+        event: Event,
+    ) -> Result<crate::Entry, JournalError> {
+        let head = self.append(at.clone(), event.clone())?;
+        Ok(crate::Entry::new(head, at, event))
+    }
+
     fn quarantine(
         &mut self,
         torn: &[u8],
