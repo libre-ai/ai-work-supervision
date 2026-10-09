@@ -14,7 +14,7 @@ import {
   parseArguments,
   sha256Of,
   verifyDigest,
-} from "./check-dependency-policy.ts";
+} from "./check-dependency-policy";
 
 describe("archiveFor", () => {
   test("pins the CI runner archive to the fleet template digest", () => {
