@@ -274,3 +274,49 @@ fn usage_errors_and_a_missing_root_are_refused() {
     assert!(!output.status.success(), "no daemon: refused");
     assert!(String::from_utf8_lossy(&output.stderr).contains("transport.connect"));
 }
+
+#[test]
+fn journal_verify_checks_the_anchor_kept_outside_the_root() {
+    let setup = setup();
+    let anchor = setup.base.join("private-anchors.v0");
+    let config = fs::read_to_string(setup.root.join("config.toml")).unwrap();
+    fs::write(
+        setup.root.join("config.toml"),
+        format!("{config}[anchor]\npath = \"{}\"\n", anchor.display()),
+    )
+    .unwrap();
+    let mut daemon = start(&setup.root);
+    let brief = setup.base.join("brief.txt");
+    fs::write(&brief, "exit 0\n").unwrap();
+    for title in ["one", "two"] {
+        ok(
+            &setup.root,
+            &[
+                "mission",
+                "new",
+                "--repository",
+                "sample",
+                "--title",
+                title,
+                "--brief",
+                brief.to_str().unwrap(),
+            ],
+        );
+    }
+    daemon.kill().unwrap();
+    daemon.wait().unwrap();
+    let verified = ok(&setup.root, &["journal", "verify"]);
+    assert_eq!(verified["anchor"]["status"], "matched");
+    assert_eq!(verified["anchor"]["seq"], 2);
+    // A complete, consistent rewrite: the chain is valid, the anchor is not.
+    let journal = setup.root.join("journal").join("journal.v0.jsonl");
+    let lines: Vec<String> = fs::read_to_string(&journal)
+        .unwrap()
+        .lines()
+        .map(str::to_owned)
+        .collect();
+    fs::write(&journal, format!("{}\n", lines[0])).unwrap();
+    let output = ws(&setup.root, &["journal", "verify"]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("journal.anchor_mismatch"));
+}

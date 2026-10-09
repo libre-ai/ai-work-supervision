@@ -39,6 +39,7 @@ pub(crate) struct Core {
     supervisor: Supervisor,
     worktrees: Worktrees,
     runs: HashMap<String, RunHandle>,
+    anchored: u64,
 }
 
 /// The shared daemon state.
@@ -107,6 +108,17 @@ impl Core {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(_) => return Err(Failure::new("journal.unreadable")),
         }
+        // (1b) The head anchored outside the root must still be in the journal:
+        // the chain alone cannot see a complete, consistent rewrite.
+        if let Some(path) = config.anchor() {
+            match crate::Anchor::read(path)? {
+                Some(anchor) => crate::check_anchor(&layout.journal(), &anchor)?,
+                None if recovered.journal_entries > 0 => {
+                    return Err(Failure::new("journal.anchor_missing"));
+                }
+                None => {}
+            }
+        }
         // (3) Writer lock, torn-tail quarantine, projection caught up.
         let supervisor =
             Supervisor::open(&layout, OpenMode::RecoverTornTail { at: clock::now()? })?;
@@ -117,8 +129,10 @@ impl Core {
             supervisor,
             worktrees,
             runs: HashMap::new(),
+            anchored: 0,
         };
         core.recover(&mut recovered)?;
+        core.anchor()?;
         Ok((Arc::new(Mutex::new(core)), recovered))
     }
 
@@ -198,6 +212,22 @@ impl Core {
                 _ => {}
             }
         }
+        Ok(())
+    }
+
+    /// Records the journal head in the anchor file when it moved.
+    pub(crate) fn anchor(&mut self) -> Result<(), Failure> {
+        let Some(path) = self.config.anchor().map(std::path::Path::to_owned) else {
+            return Ok(());
+        };
+        let Some(head) = self.supervisor.journal().head().copied() else {
+            return Ok(());
+        };
+        if head.seq() == self.anchored {
+            return Ok(());
+        }
+        crate::Anchor::new(head.seq(), &head.digest().to_hex())?.write(&path)?;
+        self.anchored = head.seq();
         Ok(())
     }
 
@@ -562,6 +592,7 @@ fn supervise(shared: &Shared, mission: &MissionId, run: &RunId, session: Session
         if let Err(failure) = observe(shared, mission, run, &observation) {
             eprintln!("wsd: run observation refused: {failure}");
         }
+        anchor(shared);
     });
     let finished = (|| -> Result<(), Failure> {
         let mut core = lock(shared)?;
@@ -591,6 +622,7 @@ fn supervise(shared: &Shared, mission: &MissionId, run: &RunId, session: Session
     if let Err(failure) = finished {
         eprintln!("wsd: run end refused: {failure}");
     }
+    anchor(shared);
 }
 
 fn observe(
@@ -759,4 +791,12 @@ fn wait(shared: &Shared, request: &Value) -> Result<Value, Failure> {
 /// Where the socket lives.
 pub(crate) fn socket_path(layout: &Layout) -> PathBuf {
     layout.root().join("run").join("wsd.sock")
+}
+
+/// Anchors the head after a request or a run event; a failure is reported by code.
+pub(crate) fn anchor(shared: &Shared) {
+    let outcome = lock(shared).and_then(|mut core| core.anchor());
+    if let Err(failure) = outcome {
+        eprintln!("wsd: anchor not written: {failure}");
+    }
 }

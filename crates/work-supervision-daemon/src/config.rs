@@ -18,6 +18,9 @@
 //! path = "/usr/local/bin:/usr/bin:/bin"  # PATH given to runs
 //! idle_after_ms = 2000                   # silence before waiting-input
 //! grace_ms = 2000                        # SIGTERM → SIGKILL delay
+//!
+//! [anchor]
+//! path = "/absolute/path/outside/the/root/anchors.v0"
 //! ```
 
 use std::collections::BTreeMap;
@@ -36,6 +39,7 @@ pub struct Config {
     path: String,
     idle_after_ms: u64,
     grace_ms: u64,
+    anchor: Option<PathBuf>,
 }
 
 const DEFAULT_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
@@ -65,6 +69,7 @@ impl Config {
             path: DEFAULT_PATH.to_owned(),
             idle_after_ms: 2_000,
             grace_ms: 2_000,
+            anchor: None,
         };
         let invalid = Failure::new("config.invalid");
         let mut section = String::new();
@@ -77,7 +82,7 @@ impl Config {
                 .strip_prefix('[')
                 .and_then(|rest| rest.strip_suffix(']'))
             {
-                if !matches!(name, "repositories" | "executor" | "runs") {
+                if !matches!(name, "repositories" | "executor" | "runs" | "anchor") {
                     return Err(invalid);
                 }
                 name.clone_into(&mut section);
@@ -109,6 +114,13 @@ impl Config {
                 }
                 ("runs", "grace_ms", Value::Integer(milliseconds)) => {
                     config.grace_ms = milliseconds
+                }
+                ("anchor", "path", Value::Text(path)) => {
+                    let path = PathBuf::from(path);
+                    if !path.is_absolute() {
+                        return Err(invalid);
+                    }
+                    config.anchor = Some(path);
                 }
                 _ => return Err(invalid),
             }
@@ -164,6 +176,12 @@ impl Config {
     #[must_use]
     pub const fn idle_after_ms(&self) -> u64 {
         self.idle_after_ms
+    }
+
+    /// The private file the journal head is anchored to, outside the root.
+    #[must_use]
+    pub fn anchor(&self) -> Option<&Path> {
+        self.anchor.as_deref()
     }
 
     /// Delay between `SIGTERM` and `SIGKILL`, in milliseconds.

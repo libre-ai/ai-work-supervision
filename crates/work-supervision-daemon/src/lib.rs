@@ -12,6 +12,7 @@
 //! left without a PTY are recorded as interrupted, and the mission steps a
 //! crash between two entries left undone are completed.
 
+mod anchor;
 mod clock;
 mod config;
 mod core;
@@ -22,6 +23,7 @@ mod protocol;
 mod root;
 mod server;
 
+pub use anchor::{Anchor, check_anchor};
 pub use clock::now;
 pub use config::Config;
 pub use failure::Failure;
