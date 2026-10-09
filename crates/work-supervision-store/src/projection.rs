@@ -118,6 +118,7 @@ pub(crate) fn apply(
             }
         }
         kind if kind.starts_with("worktree.") => worktree(transaction, kind, &fields, seq_value),
+        kind if kind.starts_with("run.") => run(transaction, kind, &fields, seq_value),
         kind => transition(transaction, kind, &fields, blobs, seq_value, at),
     }
 }
@@ -383,6 +384,121 @@ fn worktree(
         | "worktree.remove.intent"
         | "worktree.archived"
         | "worktree.removed" => return Err(fields.invalid()),
+        _ => return Err(StoreError::UnknownKind { seq: fields.seq }),
+    };
+    if updated == 1 {
+        Ok(())
+    } else {
+        Err(fields.invalid())
+    }
+}
+
+/// `run.*` events: a run is `running` from `run.started` until `run.exited`
+/// or `run.interrupted`; checkpoints never go backwards.
+fn run(
+    transaction: &Transaction<'_>,
+    kind: &str,
+    fields: &Fields<'_>,
+    seq: i64,
+) -> Result<(), StoreError> {
+    let mission = fields.mission()?;
+    let run = fields.string("run")?;
+    if !is_lower_hex(run, 32) {
+        return Err(fields.invalid());
+    }
+    let current: Option<(String, String, i64)> = transaction
+        .query_row(
+            "SELECT mission_id, state, output_bytes FROM runs WHERE run_id = ?1",
+            [run],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .optional()?;
+    if kind == "run.started" {
+        if current.is_some() {
+            return Err(fields.invalid());
+        }
+        let inserted = transaction.execute(
+            "INSERT INTO runs (run_id, mission_id, state, argv_digest, cwd, output_bytes, inputs,
+               input_bytes, started_seq, updated_seq)
+             SELECT ?1, id, 'running', ?3, ?4, 0, 0, 0, ?5, ?5 FROM missions WHERE id = ?2",
+            params![
+                run,
+                mission,
+                fields.digest("argv_digest")?.to_hex(),
+                fields.string("cwd")?,
+                seq
+            ],
+        )?;
+        return if inserted == 1 {
+            Ok(())
+        } else {
+            Err(fields.invalid())
+        };
+    }
+    let Some((owner, state, output_bytes)) = current else {
+        return Err(fields.invalid());
+    };
+    if owner != mission || state != "running" {
+        return Err(fields.invalid());
+    }
+    let optional_integer = |key: &str| -> Result<Option<i64>, StoreError> {
+        match fields.data.get(key) {
+            Some(Value::Null) => Ok(None),
+            Some(value) => value.as_i64().map(Some).ok_or_else(|| fields.invalid()),
+            None => Err(fields.invalid()),
+        }
+    };
+    let updated = match kind {
+        "run.output.checkpoint" => {
+            let bytes = fields.integer("bytes")?;
+            if bytes < output_bytes {
+                return Err(fields.invalid());
+            }
+            transaction.execute(
+                "UPDATE runs SET output_bytes = ?2, output_digest = ?3, updated_seq = ?4 WHERE run_id = ?1",
+                params![run, bytes, fields.digest("digest")?.to_hex(), seq],
+            )?
+        }
+        "run.input" => {
+            fields.digest("digest")?;
+            transaction.execute(
+                "UPDATE runs SET inputs = inputs + 1, input_bytes = input_bytes + ?2, updated_seq = ?3
+                 WHERE run_id = ?1",
+                params![run, fields.integer("bytes")?, seq],
+            )?
+        }
+        "run.exited" => {
+            let bytes = fields.integer("bytes")?;
+            if bytes < output_bytes {
+                return Err(fields.invalid());
+            }
+            let budget = match fields.data.get("budget") {
+                Some(Value::Null) => None,
+                Some(Value::String(name)) if name == "duration" || name == "output" => {
+                    Some(name.clone())
+                }
+                _ => return Err(fields.invalid()),
+            };
+            transaction.execute(
+                "UPDATE runs SET state = 'exited', output_bytes = ?2, output_digest = ?3, exit_code = ?4,
+                   signal = ?5, budget = ?6, escalated = ?7, updated_seq = ?8
+                 WHERE run_id = ?1",
+                params![
+                    run,
+                    bytes,
+                    fields.digest("digest")?.to_hex(),
+                    optional_integer("exit_code")?,
+                    optional_integer("signal")?,
+                    budget,
+                    i64::from(fields.boolean("escalated")?),
+                    seq
+                ],
+            )?
+        }
+        "run.interrupted" => transaction.execute(
+            "UPDATE runs SET state = 'interrupted', updated_seq = ?2 WHERE run_id = ?1",
+            params![run, seq],
+        )?,
         _ => return Err(StoreError::UnknownKind { seq: fields.seq }),
     };
     if updated == 1 {

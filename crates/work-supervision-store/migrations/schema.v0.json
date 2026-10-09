@@ -216,6 +216,87 @@
       "primary_key": ["id"]
     },
     {
+      "name": "runs",
+      "columns": [
+        {
+          "name": "run_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "mission_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "argv_digest",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "cwd",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "output_bytes",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "output_digest",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "inputs",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "input_bytes",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "exit_code",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "signal",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "budget",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "escalated",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "started_seq",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "updated_seq",
+          "type": "integer",
+          "nullable": false
+        }
+      ],
+      "primary_key": ["run_id"]
+    },
+    {
       "name": "worktrees",
       "columns": [
         {

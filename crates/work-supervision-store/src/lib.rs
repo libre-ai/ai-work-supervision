@@ -355,6 +355,40 @@ impl Store {
         Ok(rows)
     }
 
+    /// Every run of mission `mission`, in start order.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::Sqlite`].
+    pub fn runs_of(&self, mission: &str) -> Result<Vec<RunRow>, StoreError> {
+        self.query_runs("WHERE mission_id = ?1 ORDER BY started_seq", Some(mission))
+    }
+
+    /// Every run still projected as `running`.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::Sqlite`].
+    pub fn running_runs(&self) -> Result<Vec<RunRow>, StoreError> {
+        self.query_runs("WHERE state = 'running' ORDER BY started_seq", None)
+    }
+
+    fn query_runs(&self, filter: &str, mission: Option<&str>) -> Result<Vec<RunRow>, StoreError> {
+        let mut statement = self.connection.prepare(&format!(
+            "SELECT run_id, mission_id, state, output_bytes, output_digest, inputs, exit_code, signal, budget
+             FROM runs {filter}"
+        ))?;
+        let rows = match mission {
+            Some(mission) => statement
+                .query_map([mission], RunRow::read)?
+                .collect::<Result<Vec<_>, _>>()?,
+            None => statement
+                .query_map([], RunRow::read)?
+                .collect::<Result<Vec<_>, _>>()?,
+        };
+        Ok(rows)
+    }
+
     /// The underlying connection, for read queries of the crates built on the projection.
     #[must_use]
     pub const fn connection(&self) -> &Connection {
@@ -436,6 +470,45 @@ impl WorktreeRow {
             head: row.get(6)?,
             delete_branch: row.get::<_, Option<i64>>(7)?.map(|flag| flag != 0),
             archive_digest: row.get(8)?,
+        })
+    }
+}
+
+/// A projected run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunRow {
+    /// Run identifier.
+    pub run: String,
+    /// Mission identifier.
+    pub mission: String,
+    /// `running`, `exited` or `interrupted`.
+    pub state: String,
+    /// Output bytes at the last checkpoint or exit.
+    pub output_bytes: i64,
+    /// Digest of that output.
+    pub output_digest: Option<String>,
+    /// Inputs written.
+    pub inputs: i64,
+    /// Exit code, when the leader exited by itself.
+    pub exit_code: Option<i64>,
+    /// Signal number, when it was terminated by one.
+    pub signal: Option<i64>,
+    /// Overrun budget, if any.
+    pub budget: Option<String>,
+}
+
+impl RunRow {
+    fn read(row: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
+        Ok(Self {
+            run: row.get(0)?,
+            mission: row.get(1)?,
+            state: row.get(2)?,
+            output_bytes: row.get(3)?,
+            output_digest: row.get(4)?,
+            inputs: row.get(5)?,
+            exit_code: row.get(6)?,
+            signal: row.get(7)?,
+            budget: row.get(8)?,
         })
     }
 }

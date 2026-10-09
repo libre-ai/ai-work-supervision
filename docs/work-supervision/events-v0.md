@@ -54,12 +54,26 @@ silently half-read.
 A step from any other state is refused (`projection.event_invalid`). Projected
 in table `worktrees` (migration 0002). Lifecycle: `worktree-v0.md`.
 
+## Run events
+
+Every run event carries `mission` and `run` (32 hex characters).
+
+| Kind | Run state after | Data |
+| --- | --- | --- |
+| `run.started` | `running` | `argv_digest` (SHA-256 of the argv, NUL-separated), `cwd` (`worktrees/<mission>`) |
+| `run.output.checkpoint` | unchanged | `bytes` (cumulative, never decreasing), `digest` (SHA-256 of the whole log prefix) |
+| `run.input` | unchanged | `bytes`, `digest` — never the content |
+| `run.exited` | `exited` | `bytes`, `digest`, `exit_code` or `null`, `signal` or `null`, `budget` (`duration`, `output` or `null`), `escalated` (boolean) |
+| `run.interrupted` | `interrupted` | — (written at recovery for a run whose PTY died with its daemon) |
+
+Projected in table `runs` (migration 0003).
+
 `journal.recovered` (written by the journal itself after a torn tail is
 quarantined) changes nothing in the projection.
 
 ## Projection
 
-- Tables: `missions`, `mission_criteria`, `mission_notes`, `worktrees`,
+- Tables: `missions`, `mission_criteria`, `mission_notes`, `worktrees`, `runs`,
   `projection_position`. Migrations: `crates/work-supervision-store/migrations/`
   (`sqlite/` and `postgres/`, same numbers), both checked against
   `migrations/schema.v0.json` — SQLite by the crate's tests, PostgreSQL in
