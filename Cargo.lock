@@ -1230,6 +1230,7 @@ version = "0.1.0"
 dependencies = [
  "ratatui",
  "serde_json",
+ "sha2",
  "tempfile",
  "vt100",
  "work-supervision-daemon",

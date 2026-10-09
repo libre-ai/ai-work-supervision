@@ -5,10 +5,11 @@ use crate::StoreError;
 
 /// Ordered SQLite migrations; the PostgreSQL equivalents live in
 /// `migrations/postgres/` with the same numbers.
-pub(crate) const MIGRATIONS: [&str; 3] = [
+pub(crate) const MIGRATIONS: [&str; 4] = [
     include_str!("../migrations/sqlite/0001_projection.sql"),
     include_str!("../migrations/sqlite/0002_worktrees.sql"),
     include_str!("../migrations/sqlite/0003_runs.sql"),
+    include_str!("../migrations/sqlite/0004_coordination.sql"),
 ];
 
 /// Identifier of the schema description format (`migrations/schema.v0.json`).

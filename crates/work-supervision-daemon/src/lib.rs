@@ -15,6 +15,7 @@
 mod anchor;
 mod clock;
 mod config;
+mod coordination;
 mod core;
 mod failure;
 mod fault;

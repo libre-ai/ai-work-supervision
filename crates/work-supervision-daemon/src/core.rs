@@ -34,11 +34,13 @@ struct RunHandle {
 
 /// Everything the daemon holds, behind one lock.
 pub(crate) struct Core {
-    layout: Layout,
-    config: Config,
-    supervisor: Supervisor,
-    worktrees: Worktrees,
+    pub(crate) layout: Layout,
+    pub(crate) config: Config,
+    pub(crate) supervisor: Supervisor,
+    pub(crate) worktrees: Worktrees,
     runs: HashMap<String, RunHandle>,
+    /// Missions whose checks are running, with the thread running them.
+    pub(crate) checks: HashMap<String, Option<JoinHandle<()>>>,
     anchored: u64,
 }
 
@@ -56,13 +58,18 @@ pub(crate) struct Recovered {
     pub(crate) exited_missions: u64,
     pub(crate) provisioned_missions: u64,
     pub(crate) released_worktrees: u64,
+    pub(crate) checks_interrupted: u64,
+    pub(crate) promotions_confirmed: u64,
+    pub(crate) promotions_aborted: u64,
+    pub(crate) scope_checks: u64,
+    pub(crate) scope_check_failures: u64,
 }
 
-fn lock(shared: &Shared) -> Result<MutexGuard<'_, Core>, Failure> {
+pub(crate) fn lock(shared: &Shared) -> Result<MutexGuard<'_, Core>, Failure> {
     shared.lock().map_err(|_| Failure::new("daemon.poisoned"))
 }
 
-fn random_bytes() -> Result<[u8; 16], Failure> {
+pub(crate) fn random_bytes() -> Result<[u8; 16], Failure> {
     let mut bytes = [0_u8; 16];
     fs::File::open("/dev/urandom")
         .and_then(|mut file| file.read_exact(&mut bytes))
@@ -70,18 +77,18 @@ fn random_bytes() -> Result<[u8; 16], Failure> {
     Ok(bytes)
 }
 
-fn field<'a>(request: &'a Value, key: &str) -> Result<&'a str, Failure> {
+pub(crate) fn field<'a>(request: &'a Value, key: &str) -> Result<&'a str, Failure> {
     request
         .get(key)
         .and_then(Value::as_str)
         .ok_or(Failure::new("request.field_invalid"))
 }
 
-fn mission_field(request: &Value) -> Result<MissionId, Failure> {
+pub(crate) fn mission_field(request: &Value) -> Result<MissionId, Failure> {
     MissionId::parse(field(request, "mission")?).map_err(|_| Failure::new("request.field_invalid"))
 }
 
-fn optional_u64(request: &Value, key: &str, default: u64) -> Result<u64, Failure> {
+pub(crate) fn optional_u64(request: &Value, key: &str, default: u64) -> Result<u64, Failure> {
     match request.get(key) {
         None | Some(Value::Null) => Ok(default),
         Some(value) => value.as_u64().ok_or(Failure::new("request.field_invalid")),
@@ -129,6 +136,7 @@ impl Core {
             supervisor,
             worktrees,
             runs: HashMap::new(),
+            checks: HashMap::new(),
             anchored: 0,
         };
         core.recover(&mut recovered)?;
@@ -212,7 +220,7 @@ impl Core {
                 _ => {}
             }
         }
-        Ok(())
+        crate::coordination::recover(self, recovered)
     }
 
     /// Records the journal head in the anchor file when it moved.
@@ -231,13 +239,17 @@ impl Core {
         Ok(())
     }
 
-    fn mission(&self, id: &MissionId) -> Result<Mission, Failure> {
+    pub(crate) fn mission(&self, id: &MissionId) -> Result<Mission, Failure> {
         self.supervisor
             .mission(id)?
             .ok_or(Failure::new("mission.not_found"))
     }
 
-    fn execute(&mut self, id: &MissionId, command: &Command) -> Result<Mission, Failure> {
+    pub(crate) fn execute(
+        &mut self,
+        id: &MissionId,
+        command: &Command,
+    ) -> Result<Mission, Failure> {
         let revision = self
             .supervisor
             .mission(id)?
@@ -247,7 +259,7 @@ impl Core {
             .execute(id, command, revision, clock::now()?)?)
     }
 
-    fn worktree_state(&self, id: &MissionId) -> Result<Option<String>, Failure> {
+    pub(crate) fn worktree_state(&self, id: &MissionId) -> Result<Option<String>, Failure> {
         Ok(self
             .supervisor
             .store()
@@ -283,7 +295,7 @@ fn event(kind: &str, fields: &[(&str, &str)]) -> Result<Event, Failure> {
     Event::new(kind, data).map_err(|_| Failure::new("journal.invalid"))
 }
 
-fn event_with(kind: &str, data: Value) -> Result<Event, Failure> {
+pub(crate) fn event_with(kind: &str, data: Value) -> Result<Event, Failure> {
     let Value::Object(map) = data else {
         return Err(Failure::new("journal.invalid"));
     };
@@ -296,6 +308,7 @@ pub(crate) fn handle(shared: &Shared, request: &Value) -> Result<Value, Failure>
         .get("op")
         .and_then(Value::as_str)
         .ok_or(Failure::new("request.malformed"))?;
+    crate::coordination::authorize(op, request)?;
     match op {
         "status" => {
             let core = lock(shared)?;
@@ -349,6 +362,7 @@ pub(crate) fn handle(shared: &Shared, request: &Value) -> Result<Value, Failure>
             core.recover(&mut recovered)?;
             Ok(report_json(&recovered))
         }
+        op if crate::coordination::handles(op) => crate::coordination::handle(shared, op, request),
         _ => Err(Failure::new("request.unknown_op")),
     }
 }
@@ -363,6 +377,11 @@ pub(crate) fn report_json(recovered: &Recovered) -> Value {
         "missions_exited": recovered.exited_missions,
         "missions_provisioned": recovered.provisioned_missions,
         "worktrees_released": recovered.released_worktrees,
+        "checks_interrupted": recovered.checks_interrupted,
+        "promotions_confirmed": recovered.promotions_confirmed,
+        "promotions_aborted": recovered.promotions_aborted,
+        "scope_checks_recorded": recovered.scope_checks,
+        "scope_checks_failed": recovered.scope_check_failures,
     })
 }
 
@@ -409,12 +428,24 @@ fn mission_list(shared: &Shared) -> Result<Value, Failure> {
             "worktree": core.worktree_state(mission.id())?,
             "running": core.runs.contains_key(mission.id().as_str()),
             "simulation": is_simulation(&mission),
+            "blockers": crate::coordination::blocker_codes(&core, &mission)?,
         }));
     }
     Ok(Value::Array(list))
 }
 
 fn show(core: &Core, mission: &Mission) -> Result<Value, Failure> {
+    let mut shown = show_core(core, mission)?;
+    if let (Value::Object(shown), Value::Object(extras)) = (
+        &mut shown,
+        crate::coordination::mission_extras(core, mission)?,
+    ) {
+        shown.extend(extras);
+    }
+    Ok(shown)
+}
+
+fn show_core(core: &Core, mission: &Mission) -> Result<Value, Failure> {
     let worktree = core.supervisor.store().worktree(mission.id().as_str())?;
     let runs = core.supervisor.store().runs_of(mission.id().as_str())?;
     Ok(json!({
@@ -468,6 +499,7 @@ fn run(shared: &Shared, id: &MissionId) -> Result<Value, Failure> {
         return Err(Failure::new("run.already_active"));
     }
     let mission = core.mission(id)?;
+    crate::coordination::guard_run(&core, &mission)?;
     if mission.state() == State::Ready {
         if core.worktree_state(id)?.as_deref() != Some("created") {
             let repository = core.config.repository(mission.repository())?.to_owned();
@@ -713,16 +745,32 @@ fn submit(shared: &Shared, request: &Value) -> Result<Value, Failure> {
         },
     )?;
     fault::hit("result-submitted");
-    Ok(json!({}))
+    // The result is journalled: a failing scope check is reported, not
+    // returned as a refusal of a submission that took place.
+    match crate::coordination::record_scope_check(&mut core, &id) {
+        Ok(outside) => Ok(json!({ "scope_outside": outside })),
+        Err(failure) => Ok(json!({ "scope_outside": null, "scope_check_failed": failure.code() })),
+    }
 }
 
 fn decide(shared: &Shared, request: &Value) -> Result<Value, Failure> {
     let id = mission_field(request)?;
     let reason = field(request, "reason")?.to_owned();
+    // A decision while checks run would race their worktree: the test is made
+    // under the very lock that executes the decision, never before it.
+    let idle = |core: &Core| {
+        if core.checks.contains_key(id.as_str()) {
+            Err(Failure::new("check.running"))
+        } else {
+            Ok(())
+        }
+    };
     match field(request, "decision")? {
         "accept" => {
             let mut core = lock(shared)?;
-            core.mission(&id)?;
+            idle(&core)?;
+            let mission = core.mission(&id)?;
+            crate::coordination::guard_accept(&mut core, &mission)?;
             if core.worktree_state(&id)?.as_deref() == Some("created")
                 && !core.worktrees.is_clean(&id)?
             {
@@ -734,11 +782,14 @@ fn decide(shared: &Shared, request: &Value) -> Result<Value, Failure> {
             Ok(json!({ "state": mission.state().as_str() }))
         }
         "reject" => {
-            let mission = lock(shared)?.execute(&id, &Command::Reject { reason })?;
+            let mut core = lock(shared)?;
+            idle(&core)?;
+            let mission = core.execute(&id, &Command::Reject { reason })?;
             Ok(json!({ "state": mission.state().as_str() }))
         }
         "abandon" => {
             let mut core = lock(shared)?;
+            idle(&core)?;
             let mission = core.execute(&id, &Command::Abandon { reason })?;
             core.release(&mission, Release::Abandon)?;
             Ok(json!({ "state": mission.state().as_str() }))
@@ -758,6 +809,7 @@ fn decide(shared: &Shared, request: &Value) -> Result<Value, Failure> {
                     .map_err(|_| Failure::new("run.supervisor_failed"))?;
             }
             let mut core = lock(shared)?;
+            idle(&core)?;
             let mission = core.execute(&id, &Command::Cancel { reason })?;
             core.release(&mission, Release::Abandon)?;
             Ok(json!({ "state": mission.state().as_str() }))

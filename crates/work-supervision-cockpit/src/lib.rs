@@ -5,10 +5,15 @@
 //!
 //! - it listens on `127.0.0.1` only and opens the projection read-only;
 //! - pages show missions, results, evidence digests, run counters and digests,
-//!   verdicts and notes — never terminal output, and no route reaches a PTY,
-//!   a run log or an input;
-//! - the two writes, a decision and a note, are sent to `wsd` over its socket,
-//!   which journals them exactly as `ws decide` and `ws note` do.
+//!   verdicts and notes, the contract (scope, dependencies, checks), open
+//!   decision requests with their options side by side, deferred ideas and
+//!   declared agent sessions — never terminal output, and no route reaches a
+//!   PTY, a run log or an input;
+//! - every write — a decision, a note, an answer to or a withdrawal of a
+//!   decision request, a promotion or a dismissal of an idea — is sent to
+//!   `wsd` over its socket, which journals it exactly as `ws` does;
+//! - blockers depend on what only `wsd` holds, so they are asked of it and
+//!   shown unknown when it cannot be reached, never guessed.
 //!
 //! Every request must carry `Host: 127.0.0.1:<port>` or `localhost:<port>`
 //! (DNS rebinding, `421`). Every page but the login form needs the session
@@ -299,8 +304,254 @@ impl Cockpit {
                 id,
                 json!({ "op": "note", "mission": id, "text": form.get("text").cloned().unwrap_or_default() }),
             ),
+            ("GET", ["decisions"]) => self.decisions(&csrf),
+            ("GET", ["ideas"]) => self.ideas(&csrf),
+            ("GET", ["sessions"]) => self.sessions(),
+            ("POST", ["requests", id, "answer"]) => {
+                let Some(choice) = form.get("choice").and_then(|value| value.parse::<u64>().ok())
+                else {
+                    return Page::refused(400, "request.field_invalid");
+                };
+                self.forward_to(
+                    id,
+                    json!({
+                        "op": "request.answer", "request": id, "choice": choice,
+                        "reason": form.get("reason").cloned().unwrap_or_default(),
+                    }),
+                    "/decisions",
+                )
+            }
+            ("POST", ["requests", id, "withdraw"]) => self.forward_to(
+                id,
+                json!({
+                    "op": "request.withdraw", "request": id,
+                    "reason": form.get("reason").cloned().unwrap_or_default(),
+                }),
+                "/decisions",
+            ),
+            ("POST", ["ideas", id, "dismiss"]) => self.forward_to(
+                id,
+                json!({
+                    "op": "idea.dismiss", "idea": id,
+                    "reason": form.get("reason").cloned().unwrap_or_default(),
+                }),
+                "/ideas",
+            ),
+            ("POST", ["ideas", id, "promote"]) => self.forward_to(
+                id,
+                json!({
+                    "op": "idea.promote", "idea": id,
+                    "title": form.get("title").cloned().unwrap_or_default(),
+                    "repository": form.get("repository").filter(|name| !name.is_empty()),
+                }),
+                "/ideas",
+            ),
             _ => Page::refused(404, "request.not_found"),
         }
+    }
+
+    /// Asks `wsd` a read-only question; `None` when it cannot be reached.
+    fn ask(&self, request: &serde_json::Value) -> Option<serde_json::Value> {
+        let socket = self.root.join("run").join("wsd.sock");
+        Client::connect(&socket)
+            .and_then(|mut client| client.request(request))
+            .ok()
+    }
+
+    /// Sends a write to `wsd` for the object `id` (32 hexadecimal characters),
+    /// then shows `back`.
+    fn forward_to(&self, id: &str, request: serde_json::Value, back: &str) -> Page {
+        if !is_identifier(id) {
+            return Page::refused(404, "request.not_found");
+        }
+        let socket = self.root.join("run").join("wsd.sock");
+        let outcome = Client::connect(&socket).and_then(|mut client| client.request(&request));
+        match outcome {
+            Ok(_) => Page::redirect(back),
+            Err(error) => Page::refused(409, error.code()),
+        }
+    }
+
+    /// Open decision requests, their options side by side, and the answer form.
+    fn decisions(&self, csrf: &str) -> Page {
+        let store = match self.store() {
+            Ok(store) => store,
+            Err(page) => return page,
+        };
+        let requests = match store.requests(false) {
+            Ok(requests) => requests,
+            Err(error) => return Page::refused(500, error.code()),
+        };
+        let open: Vec<_> = requests.iter().filter(|row| row.state == "open").collect();
+        let mut html = format!(
+            "{nav}<h1>Decisions</h1><p>{count} open request(s). Each option shows what choosing it entails and whether it can be undone.</p>",
+            nav = nav(),
+            count = open.len()
+        );
+        for request in &open {
+            let mission = request.mission.as_deref().map_or_else(String::new, |id| {
+                format!(
+                    " · mission <a href=\"/missions/{id}\">{short}</a>",
+                    short = id.get(..8).unwrap_or_default()
+                )
+            });
+            let _ = write!(
+                html,
+                "<section class=\"request\"><h2>{question}</h2><p class=\"muted\">opened by {opener} at <time>{at}</time>{mission}</p><form method=\"post\" action=\"/requests/{id}/answer\"><input type=\"hidden\" name=\"csrf\" value=\"{csrf}\"><table><thead><tr><th>Choose</th><th>Option</th><th>Consequence</th><th>Reversibility</th></tr></thead><tbody>",
+                question = escape(&request.question),
+                opener = escape(&request.opened_by),
+                at = escape(&request.created_at),
+                id = request.id,
+            );
+            for (position, option) in request.options.iter().enumerate() {
+                let recommended = request
+                    .recommended
+                    .and_then(|index| usize::try_from(index).ok())
+                    == Some(position);
+                let _ = write!(
+                    html,
+                    "<tr><td><input type=\"radio\" name=\"choice\" value=\"{position}\" id=\"c{id}{position}\" required></td><td><label for=\"c{id}{position}\">{label}</label>{badge}</td><td>{consequence}</td><td><span class=\"rev rev-{reversibility}\">{reversibility}</span></td></tr>",
+                    id = request.id,
+                    label = escape(&option.label),
+                    badge = if recommended {
+                        " <strong>(recommended)</strong>"
+                    } else {
+                        ""
+                    },
+                    consequence = escape(&option.consequence),
+                    reversibility = escape(&option.reversibility),
+                );
+            }
+            let _ = write!(
+                html,
+                "</tbody></table><label>Reason <textarea name=\"reason\" required></textarea></label> <button>Answer</button></form><form method=\"post\" action=\"/requests/{id}/withdraw\"><input type=\"hidden\" name=\"csrf\" value=\"{csrf}\"><label>Withdraw, reason <textarea name=\"reason\" required></textarea></label> <button>Withdraw</button></form></section>",
+                id = request.id,
+            );
+        }
+        let closed: Vec<_> = requests
+            .iter()
+            .filter(|row| row.state != "open")
+            .take(20)
+            .collect();
+        if !closed.is_empty() {
+            html.push_str("<h2>Recently closed</h2><table><thead><tr><th>Question</th><th>State</th><th>Choice</th><th>Reason</th></tr></thead><tbody>");
+            for request in closed {
+                let choice = request
+                    .choice
+                    .and_then(|index| usize::try_from(index).ok())
+                    .and_then(|index| request.options.get(index))
+                    .map(|option| option.label.as_str())
+                    .unwrap_or_default();
+                let _ = write!(
+                    html,
+                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+                    escape(&request.question),
+                    escape(&request.state),
+                    escape(choice),
+                    escape(request.reason.as_deref().unwrap_or_default()),
+                );
+            }
+            html.push_str("</tbody></table>");
+        }
+        Page::new(200, layout("Decisions", &html))
+    }
+
+    /// Deferred ideas, with promotion and dismissal for the open ones.
+    fn ideas(&self, csrf: &str) -> Page {
+        let store = match self.store() {
+            Ok(store) => store,
+            Err(page) => return page,
+        };
+        let ideas = match store.ideas() {
+            Ok(ideas) => ideas,
+            Err(error) => return Page::refused(500, error.code()),
+        };
+        let mut html = format!(
+            "{nav}<h1>Ideas</h1><p>{count} idea(s), newest first.</p><table><thead><tr><th>Captured</th><th>By</th><th>State</th><th>Idea</th><th>Repository</th><th>Act</th></tr></thead><tbody>",
+            nav = nav(),
+            count = ideas.len()
+        );
+        for idea in &ideas {
+            let act = match idea.state.as_str() {
+                "captured" | "qualified" => format!(
+                    "<form method=\"post\" action=\"/ideas/{id}/promote\"><input type=\"hidden\" name=\"csrf\" value=\"{csrf}\"><input name=\"title\" placeholder=\"Mission title\" required> <input name=\"repository\" placeholder=\"repository\" value=\"{repository}\"> <button>Promote</button></form><form method=\"post\" action=\"/ideas/{id}/dismiss\"><input type=\"hidden\" name=\"csrf\" value=\"{csrf}\"><input name=\"reason\" placeholder=\"reason\" required> <button>Dismiss</button></form>",
+                    id = idea.id,
+                    repository = escape(idea.repository.as_deref().unwrap_or_default()),
+                ),
+                "promoted" => idea
+                    .promoted_mission
+                    .as_deref()
+                    .map_or_else(String::new, |id| {
+                        format!("<a href=\"/missions/{id}\">mission</a>")
+                    }),
+                _ => escape(idea.dismiss_reason.as_deref().unwrap_or_default()),
+            };
+            let _ = write!(
+                html,
+                "<tr><td><time>{}</time></td><td>{}</td><td>{}</td><td>{}{}</td><td>{}</td><td>{act}</td></tr>",
+                escape(&idea.created_at),
+                escape(&idea.captured_by),
+                escape(&idea.state),
+                escape(&idea.text),
+                idea.context
+                    .as_deref()
+                    .map(|context| format!("<br><small>{}</small>", escape(context)))
+                    .unwrap_or_default(),
+                escape(idea.repository.as_deref().unwrap_or_default()),
+            );
+        }
+        html.push_str("</tbody></table>");
+        Page::new(200, layout("Ideas", &html))
+    }
+
+    /// Declared agent sessions; their states are what they reported, not verified.
+    fn sessions(&self) -> Page {
+        let Some(serde_json::Value::Array(sessions)) = self.ask(&json!({ "op": "session.list" }))
+        else {
+            return Page::new(
+                200,
+                layout(
+                    "Sessions",
+                    &format!(
+                        "{}<h1>Sessions</h1><p>wsd unreachable: session silence cannot be computed.</p>",
+                        nav()
+                    ),
+                ),
+            );
+        };
+        let mut html = format!(
+            "{nav}<h1>Agent sessions</h1><p>What each session declared through the bridge. A reported state is never a verified result; a session silent for more than 15 minutes is marked silent, never presumed ended.</p><table><thead><tr><th>Harness</th><th>State</th><th>Reported</th><th>Note</th><th>Repository</th><th>Mission</th><th>Label</th><th>Last report</th></tr></thead><tbody>",
+            nav = nav()
+        );
+        let text = |value: &serde_json::Value| escape(value.as_str().unwrap_or_default());
+        for session in &sessions {
+            let state = if session["silent"] == true {
+                "<strong>silent</strong>".to_owned()
+            } else {
+                text(&session["state"])
+            };
+            let mission = session["mission"]
+                .as_str()
+                .filter(|id| is_identifier(id))
+                .map_or_else(String::new, |id| {
+                    format!(
+                        "<a href=\"/missions/{id}\">{}</a>",
+                        id.get(..8).unwrap_or_default()
+                    )
+                });
+            let _ = write!(
+                html,
+                "<tr><td>{}</td><td>{state}</td><td>{}</td><td>{}</td><td>{}</td><td>{mission}</td><td>{}</td><td><time>{}</time></td></tr>",
+                text(&session["harness"]),
+                text(&session["reported_state"]),
+                text(&session["note"]),
+                text(&session["repository"]),
+                text(&session["label"]),
+                text(&session["updated_at"]),
+            );
+        }
+        html.push_str("</tbody></table>");
+        Page::new(200, layout("Sessions", &html))
     }
 
     fn login(&self, token: &str) -> Page {
@@ -336,6 +587,28 @@ impl Cockpit {
             Ok(missions) => missions,
             Err(error) => return Page::refused(500, error.code()),
         };
+        // Blockers depend on what only wsd holds (running checks, worktrees of
+        // other missions): asked, never guessed; shown unknown when unreachable.
+        let blockers: Option<HashMap<String, String>> = self
+            .ask(&json!({ "op": "mission.list" }))
+            .and_then(|list| list.as_array().cloned())
+            .map(|list| {
+                list.iter()
+                    .filter_map(|row| {
+                        let id = row["id"].as_str()?.to_owned();
+                        let codes: Vec<&str> = row["blockers"]
+                            .as_array()?
+                            .iter()
+                            .filter_map(serde_json::Value::as_str)
+                            .collect();
+                        Some((id, codes.join(", ")))
+                    })
+                    .collect()
+            });
+        let open_requests = store
+            .requests(true)
+            .map(|requests| requests.len())
+            .unwrap_or_default();
         let mut rows = String::new();
         for mission in &missions {
             let worktree = store
@@ -344,9 +617,13 @@ impl Cockpit {
                 .flatten()
                 .map(|row| row.state)
                 .unwrap_or_default();
+            let blocked = blockers.as_ref().map_or_else(
+                || "unknown (wsd unreachable)".to_owned(),
+                |map| escape(map.get(mission.id().as_str()).map_or("", String::as_str)),
+            );
             let _ = write!(
                 rows,
-                "<tr><td><a href=\"/missions/{id}\">{short}</a></td><td>{title}</td><td class=\"state\">{state}</td><td>{worktree}</td><td>{revision}</td></tr>",
+                "<tr><td><a href=\"/missions/{id}\">{short}</a></td><td>{title}</td><td class=\"state\">{state}</td><td>{blocked}</td><td>{worktree}</td><td>{revision}</td></tr>",
                 id = mission.id().as_str(),
                 short = mission.id().as_str().get(..8).unwrap_or_default(),
                 title = escape(mission.title()),
@@ -360,7 +637,8 @@ impl Cockpit {
             layout(
                 "Missions",
                 &format!(
-                    "<h1>Missions</h1><p>{count} mission(s).</p><table><thead><tr><th>Id</th><th>Title</th><th>State</th><th>Worktree</th><th>Revision</th></tr></thead><tbody>{rows}</tbody></table>",
+                    "{nav}<h1>Missions</h1><p>{count} mission(s). <a href=\"/decisions\">{open_requests} decision(s) waiting for you</a>.</p><table><thead><tr><th>Id</th><th>Title</th><th>State</th><th>Blocked by</th><th>Worktree</th><th>Revision</th></tr></thead><tbody>{rows}</tbody></table>",
+                    nav = nav(),
                     count = missions.len()
                 ),
             ),
@@ -393,10 +671,87 @@ impl Cockpit {
             brief = escape(mission.brief()),
             badge = simulation_badge(&mission),
         );
-        for criterion in mission.criteria() {
-            let _ = write!(html, "<li>{}</li>", escape(criterion));
+        let checks = store.criterion_checks(&mission_id).unwrap_or_default();
+        let executions = store.check_runs(&mission_id).unwrap_or_default();
+        for (position, criterion) in mission.criteria().iter().enumerate() {
+            let check = checks.iter().find(|check| check.criterion == position);
+            // The last finished execution decides, as for the acceptance guard.
+            let last = executions.iter().rev().find(|row| {
+                row.state == "finished" && usize::try_from(row.criterion).ok() == Some(position)
+            });
+            let verification = match (check, last) {
+                (None, _) => " <small>(no check)</small>".to_owned(),
+                (Some(check), None) => format!(
+                    " <small>check <code>{}</code>, never run</small>",
+                    escape(&check.argv.join(" "))
+                ),
+                (Some(check), Some(row)) => format!(
+                    " <small>check <code>{}</code>: {} at <code>{}</code></small>",
+                    escape(&check.argv.join(" ")),
+                    if row.passed() { "passed" } else { "not passed" },
+                    escape(row.commit.get(..12).unwrap_or_default()),
+                ),
+            };
+            let _ = write!(html, "<li>{}{verification}</li>", escape(criterion));
         }
-        html.push_str("</ul><h2>Result</h2>");
+        html.push_str("</ul><h2>Contract</h2><dl><dt>Scope</dt><dd>");
+        match store.scope(&mission_id) {
+            Ok(Some(paths)) => {
+                let names: Vec<String> = paths
+                    .iter()
+                    .map(|path| format!("<code>{}</code>", escape(path.as_str())))
+                    .collect();
+                html.push_str(&names.join(", "));
+            }
+            _ => html.push_str("undeclared (whole repository)"),
+        }
+        html.push_str("</dd><dt>Depends on</dt><dd>");
+        for (on, state) in store.dependencies_of(&mission_id).unwrap_or_default() {
+            let _ = write!(
+                html,
+                "<a href=\"/missions/{on}\">{short}</a> ({state}) ",
+                short = on.as_str().get(..8).unwrap_or_default(),
+                state = state.as_str()
+            );
+        }
+        let blockers = self
+            .ask(&json!({ "op": "mission.show", "mission": id }))
+            .and_then(|shown| {
+                shown
+                    .get("blockers")
+                    .and_then(serde_json::Value::as_array)
+                    .cloned()
+            })
+            .map_or_else(
+                || "unknown (wsd unreachable)".to_owned(),
+                |codes| {
+                    let codes: Vec<String> = codes
+                        .iter()
+                        .filter_map(serde_json::Value::as_str)
+                        .map(escape)
+                        .collect();
+                    if codes.is_empty() {
+                        "none".to_owned()
+                    } else {
+                        codes.join(", ")
+                    }
+                },
+            );
+        let _ = write!(html, "</dd><dt>Blocked by</dt><dd>{blockers}</dd></dl>");
+        let requests = store.requests_of(id).unwrap_or_default();
+        if !requests.is_empty() {
+            html.push_str("<h2>Decision requests</h2><ul>");
+            for request in &requests {
+                let _ = write!(
+                    html,
+                    "<li>{} — {} <a href=\"/decisions\">decisions</a></li>",
+                    escape(&request.question),
+                    escape(&request.state)
+                );
+            }
+            html.push_str("</ul>");
+        }
+        html.push_str("<h2>Result</h2>");
         match mission.result() {
             Some(result) => {
                 let _ = write!(
@@ -478,6 +833,18 @@ fn work_supervision_domain_id(id: &str) -> Result<MissionId, ()> {
     MissionId::parse(id).map_err(|_| ())
 }
 
+/// 32 lowercase hexadecimal characters: the form of every identifier in a path.
+fn is_identifier(id: &str) -> bool {
+    id.len() == 32
+        && id
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+fn nav() -> &'static str {
+    "<nav><a href=\"/\">Missions</a> · <a href=\"/decisions\">Decisions</a> · <a href=\"/ideas\">Ideas</a> · <a href=\"/sessions\">Sessions</a></nav>"
+}
+
 const SECURITY_HEADERS: [(&str, &str); 5] = [
     (
         "Content-Security-Policy",
@@ -506,7 +873,7 @@ fn escape(text: &str) -> String {
 
 fn layout(title: &str, body: &str) -> String {
     format!(
-        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>{title} — Work Supervision</title><style>:root{{--text:#1d1d1f;--muted:#5f6368;--line:#d0d4da;--accent:#0b57d0;--surface:#ffffff}}@media (prefers-color-scheme: dark){{:root{{--text:#e8eaed;--muted:#9aa0a6;--line:#3c4043;--accent:#8ab4f8;--surface:#1f1f1f}}}}body{{font:1rem/1.5 system-ui,sans-serif;color:var(--text);background:var(--surface);max-width:60rem;margin:0 auto;padding:1rem}}a{{color:var(--accent)}}table{{border-collapse:collapse;width:100%}}td,th{{border-bottom:1px solid var(--line);padding:.25rem .5rem;text-align:left}}pre{{white-space:pre-wrap;border:1px solid var(--line);padding:.5rem}}dt{{color:var(--muted)}}textarea{{width:100%;min-height:3rem}}</style></head><body>{body}</body></html>",
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>{title} — Work Supervision</title><style>:root{{--text:#1d1d1f;--muted:#5f6368;--line:#d0d4da;--accent:#0b57d0;--surface:#ffffff;--warn:#a50e0e;--caution:#8a5300}}@media (prefers-color-scheme: dark){{:root{{--text:#e8eaed;--muted:#9aa0a6;--line:#3c4043;--accent:#8ab4f8;--surface:#1f1f1f;--warn:#f28b82;--caution:#fdd663}}}}.muted{{color:var(--muted)}}.rev-irreversible{{color:var(--warn);font-weight:600}}.rev-costly{{color:var(--caution)}}section.request{{border-top:1px solid var(--line);margin-top:1rem}}nav{{margin-bottom:1rem}}body{{font:1rem/1.5 system-ui,sans-serif;color:var(--text);background:var(--surface);max-width:60rem;margin:0 auto;padding:1rem}}a{{color:var(--accent)}}table{{border-collapse:collapse;width:100%}}td,th{{border-bottom:1px solid var(--line);padding:.25rem .5rem;text-align:left}}pre{{white-space:pre-wrap;border:1px solid var(--line);padding:.5rem}}dt{{color:var(--muted)}}textarea{{width:100%;min-height:3rem}}</style></head><body>{body}</body></html>",
         title = escape(title)
     )
 }

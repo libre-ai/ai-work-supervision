@@ -476,3 +476,150 @@ fn origin_fetch_site_host_session_and_csrf_are_enforced() {
     };
     assert_eq!(token_mode, 0o600);
 }
+
+impl Http {
+    fn post(&self, path: &str, cookie: &str, body: &str) -> Reply {
+        self.send(
+            "POST",
+            path,
+            &[
+                ("Host", &self.host()),
+                ("Origin", &self.origin()),
+                ("Sec-Fetch-Site", "same-origin"),
+                ("Cookie", cookie),
+                ("Content-Type", "application/x-www-form-urlencoded"),
+            ],
+            body,
+        )
+    }
+}
+
+#[test]
+fn a_decision_request_is_compared_and_answered_at_the_cockpit() {
+    let mut world = world();
+    let session = world
+        .client
+        .request(
+            &json!({ "op": "session.register", "harness": "claude-code", "label": "cache work",
+                          "repository": "sample", "mission": world.mission }),
+        )
+        .unwrap()["session"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    world
+        .client
+        .request(&json!({ "op": "session.report", "actor": format!("session:{session}"),
+                          "session": session, "state": "waiting-input", "note": "permission_prompt" }))
+        .unwrap();
+    let request = world
+        .client
+        .request(&json!({
+            "op": "request.open", "actor": format!("session:{session}"), "mission": world.mission,
+            "question": "Keep the <b>cache</b>?",
+            "options": [
+                { "label": "Keep", "consequence": "Nothing to migrate.", "reversibility": "reversible" },
+                { "label": "Drop", "consequence": "<script>alert(1)</script> data lost", "reversibility": "irreversible" }
+            ],
+            "recommended": 0
+        }))
+        .unwrap()["request"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let http = start(&world.root);
+    let cookie = http.login(&world.root);
+    // The CSRF token belongs to the cockpit session: any form carries it.
+    let token = csrf(
+        &http
+            .get(&format!("/missions/{}", world.mission), &cookie)
+            .body,
+    );
+
+    // The mission list says what the mission waits for.
+    let list = http.get("/", &cookie);
+    assert!(list.body.contains("request.pending"), "{}", list.body);
+    assert!(list.body.contains("1 decision(s) waiting for you"));
+
+    // The options are side by side, escaped, with their reversibility.
+    let page = http.get("/decisions", &cookie);
+    assert_eq!(page.status, 200);
+    assert!(page.body.contains("Keep the &lt;b&gt;cache&lt;/b&gt;?"));
+    assert!(
+        page.body
+            .contains("&lt;script&gt;alert(1)&lt;/script&gt; data lost")
+    );
+    assert!(!page.body.contains("<script>"));
+    assert!(
+        page.body
+            .contains("class=\"rev rev-irreversible\">irreversible")
+    );
+    assert!(
+        page.body
+            .contains("Keep</label> <strong>(recommended)</strong>")
+    );
+    assert!(page.body.contains(&format!("opened by session:{session}")));
+
+    // Without the CSRF token nothing is answered; with it, the owner's answer is journalled.
+    let path = format!("/requests/{request}/answer");
+    let refused = http.post(&path, &cookie, "choice=1&reason=no");
+    assert_eq!(refused.status, 403);
+    let reply = http.post(
+        &path,
+        &cookie,
+        &format!("csrf={}&choice=1&reason=space+is+short", csrf(&page.body)),
+    );
+    assert_eq!(reply.status, 303, "{}", reply.body);
+    let answered = world
+        .client
+        .request(&json!({ "op": "request.list" }))
+        .unwrap();
+    assert_eq!(answered[0]["state"], "answered");
+    assert_eq!(answered[0]["choice"], 1);
+    assert_eq!(answered[0]["closed_by"], "owner");
+    let page = http.get("/decisions", &cookie);
+    assert!(page.body.contains("0 open request(s)"));
+    assert!(page.body.contains("<td>Drop</td>"));
+
+    // Ideas: captured by the session, promoted at the cockpit.
+    let idea = world
+        .client
+        .request(
+            &json!({ "op": "idea.capture", "actor": format!("session:{session}"),
+                          "text": "index the <cache>" }),
+        )
+        .unwrap()["idea"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let page = http.get("/ideas", &cookie);
+    assert!(page.body.contains("index the &lt;cache&gt;"));
+    let reply = http.post(
+        &format!("/ideas/{idea}/promote"),
+        &cookie,
+        &format!(
+            "csrf={}&title=Index+the+cache&repository=sample",
+            csrf(&page.body)
+        ),
+    );
+    assert_eq!(reply.status, 303, "{}", reply.body);
+    let missions = world
+        .client
+        .request(&json!({ "op": "mission.list" }))
+        .unwrap();
+    assert_eq!(missions.as_array().unwrap().len(), 2);
+
+    // Sessions: what they declared, labelled as such.
+    let page = http.get("/sessions", &cookie);
+    assert!(page.body.contains("claude-code"));
+    assert!(page.body.contains("permission_prompt"));
+    assert!(page.body.contains("never a verified result"));
+
+    // A malformed identifier in a write route reaches nothing.
+    let reply = http.post(
+        "/requests/not-an-id/answer",
+        &cookie,
+        &format!("csrf={token}&choice=0&reason=x"),
+    );
+    assert_eq!(reply.status, 404);
+}

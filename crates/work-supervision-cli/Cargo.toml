@@ -16,6 +16,7 @@ path = "src/main.rs"
 ratatui.workspace = true
 vt100.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 work-supervision-daemon = { path = "../work-supervision-daemon" }
 work-supervision-journal-verifier = { path = "../work-supervision-journal-verifier" }
 work-supervision-store = { path = "../work-supervision-store" }

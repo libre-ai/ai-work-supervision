@@ -56,7 +56,12 @@ In debug builds only, `WSD_FAULT=<point>` makes the daemon `SIGKILL` itself at
 one of 14 points (`FAULT_POINTS`). The recovery test runs a mission to each
 point, restarts the daemon and finishes the mission: the verifier is green, the
 projection equals its reconstruction, no worktree is orphaned and the accepted
-branch holds the result.
+branch holds the result. Three more points cover the coordination primitives
+(`idea-promotion-intended`, `idea-mission-created`, `check-started`); their
+recovery is tested in `crates/work-supervision-daemon/tests/coordination.rs`
+(`coordination-v0.md`). Startup recovery also interrupts checks left running,
+confirms or aborts pending idea promotions and records missing scope checks;
+`ws doctor` reports their counts.
 
 ## `ws`
 
