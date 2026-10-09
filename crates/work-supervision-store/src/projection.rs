@@ -7,7 +7,7 @@
 //! with the row it updates — known mission, revision exactly one above the
 //! stored one, state matching the kind — and refuses otherwise.
 
-use rusqlite::{Transaction, params};
+use rusqlite::{OptionalExtension as _, Transaction, params};
 use serde_json::{Map, Value};
 use work_supervision_journal::{Digest, Entry};
 
@@ -117,6 +117,7 @@ pub(crate) fn apply(
                 Err(fields.invalid())
             }
         }
+        kind if kind.starts_with("worktree.") => worktree(transaction, kind, &fields, seq_value),
         kind => transition(transaction, kind, &fields, blobs, seq_value, at),
     }
 }
@@ -298,6 +299,93 @@ fn check_current_run(
         |row| row.get(0),
     )?;
     if current.as_deref() == Some(run) {
+        Ok(())
+    } else {
+        Err(fields.invalid())
+    }
+}
+
+/// `worktree.*` events (`docs/work-supervision/worktree-v0.md`): each step of
+/// the lifecycle is accepted only from the state that precedes it.
+fn worktree(
+    transaction: &Transaction<'_>,
+    kind: &str,
+    fields: &Fields<'_>,
+    seq: i64,
+) -> Result<(), StoreError> {
+    let mission = fields.mission()?;
+    let current: Option<String> = transaction
+        .query_row(
+            "SELECT state FROM worktrees WHERE mission_id = ?1",
+            [mission],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let current = current.as_deref();
+    let updated = match kind {
+        "worktree.create.intent" => {
+            // A first intent, or a new attempt after an aborted one.
+            if !matches!(current, None | Some("aborted")) {
+                return Err(fields.invalid());
+            }
+            let path = fields.string("path")?;
+            let branch = fields.string("branch")?;
+            if path != format!("worktrees/{mission}") || branch != format!("ws/{mission}") {
+                return Err(fields.invalid());
+            }
+            transaction.execute(
+                "INSERT INTO worktrees (mission_id, repository, path, branch, base_commit, state,
+                   intent_seq, updated_seq)
+                 SELECT id, ?2, ?3, ?4, ?5, 'creating', ?6, ?6 FROM missions WHERE id = ?1
+                 ON CONFLICT (mission_id) DO UPDATE SET repository = excluded.repository,
+                   base_commit = excluded.base_commit, state = 'creating', head = NULL,
+                   delete_branch = NULL, archive_digest = NULL, archive_bytes = NULL,
+                   intent_seq = excluded.intent_seq, updated_seq = excluded.updated_seq",
+                params![
+                    mission,
+                    fields.string("repository")?,
+                    path,
+                    branch,
+                    fields.commit("base_commit")?,
+                    seq
+                ],
+            )?
+        }
+        "worktree.created" if current == Some("creating") => transaction.execute(
+            "UPDATE worktrees SET state = 'created', head = ?2, updated_seq = ?3 WHERE mission_id = ?1",
+            params![mission, fields.commit("head")?, seq],
+        )?,
+        "worktree.create.aborted" if current == Some("creating") => transaction.execute(
+            "UPDATE worktrees SET state = 'aborted', updated_seq = ?2 WHERE mission_id = ?1",
+            params![mission, seq],
+        )?,
+        "worktree.remove.intent" if current == Some("created") => transaction.execute(
+            "UPDATE worktrees SET state = 'releasing', delete_branch = ?2, updated_seq = ?3
+             WHERE mission_id = ?1",
+            params![mission, i64::from(fields.boolean("delete_branch")?), seq],
+        )?,
+        "worktree.archived" if current == Some("releasing") => transaction.execute(
+            "UPDATE worktrees SET archive_digest = ?2, archive_bytes = ?3, updated_seq = ?4
+             WHERE mission_id = ?1",
+            params![
+                mission,
+                fields.digest("archive_digest")?.to_hex(),
+                fields.integer("archive_bytes")?,
+                seq
+            ],
+        )?,
+        "worktree.removed" if current == Some("releasing") => transaction.execute(
+            "UPDATE worktrees SET state = 'removed', updated_seq = ?2 WHERE mission_id = ?1",
+            params![mission, seq],
+        )?,
+        "worktree.created"
+        | "worktree.create.aborted"
+        | "worktree.remove.intent"
+        | "worktree.archived"
+        | "worktree.removed" => return Err(fields.invalid()),
+        _ => return Err(StoreError::UnknownKind { seq: fields.seq }),
+    };
+    if updated == 1 {
         Ok(())
     } else {
         Err(fields.invalid())

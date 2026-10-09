@@ -115,13 +115,30 @@ fn step(line: &str) -> Result<Flow, &'static str> {
             git(&["commit", "-q", "-m", argument])?;
         }
         "spawn-stubborn-child" => {
+            // The child signals once its traps are installed, so that a signal
+            // sent right after this step can no longer reach it unprotected.
+            let ready =
+                std::env::temp_dir().join(format!("ws-fake-agent-{}.ready", std::process::id()));
             Command::new("/bin/sh")
-                .args(["-c", "trap '' TERM HUP; while :; do sleep 1; done"])
+                .args([
+                    "-c",
+                    "trap '' TERM HUP; : > \"$1\"; while :; do sleep 1; done",
+                    "sh",
+                ])
+                .arg(&ready)
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .spawn()
                 .map_err(|_| "spawn child")?;
+            let deadline = std::time::Instant::now() + Duration::from_secs(10);
+            while !ready.exists() {
+                if std::time::Instant::now() > deadline {
+                    return Err("child not ready");
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            let _ = std::fs::remove_file(&ready);
         }
         "env" => {
             let mut names: Vec<String> = std::env::vars_os()

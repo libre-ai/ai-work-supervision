@@ -5,7 +5,10 @@ use crate::StoreError;
 
 /// Ordered SQLite migrations; the PostgreSQL equivalents live in
 /// `migrations/postgres/` with the same numbers.
-pub(crate) const MIGRATIONS: [&str; 1] = [include_str!("../migrations/sqlite/0001_projection.sql")];
+pub(crate) const MIGRATIONS: [&str; 2] = [
+    include_str!("../migrations/sqlite/0001_projection.sql"),
+    include_str!("../migrations/sqlite/0002_worktrees.sql"),
+];
 
 /// Identifier of the schema description format (`migrations/schema.v0.json`).
 pub(crate) const SCHEMA_DESCRIPTION: &str = "libre-ai.work-supervision.projection.v0";

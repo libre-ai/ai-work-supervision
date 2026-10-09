@@ -171,7 +171,7 @@ fn an_output_budget_terminates_the_group() {
 fn a_child_that_ignores_sigterm_is_killed_with_sigkill_after_the_grace_delay() {
     let run = Run::new();
     let scenario = "spawn-stubborn-child\nprint spawned\nblock\n";
-    let session = Session::spawn(run.spec(scenario, budgets(1, 1 << 20))).unwrap();
+    let session = Session::spawn(run.spec(scenario, budgets(3, 1 << 20))).unwrap();
     let pgid = session.process_group();
     let exit = session.wait_with(|_| {}).unwrap();
     assert_eq!(exit.budget_exceeded(), Some(Budget::Duration));

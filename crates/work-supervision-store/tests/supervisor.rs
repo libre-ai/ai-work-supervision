@@ -299,3 +299,20 @@ fn the_layout_places_everything_under_the_root() {
     }
     assert!(layout.journal().ends_with("journal/journal.v0.jsonl"));
 }
+
+#[test]
+fn a_second_writer_is_refused_while_the_first_is_alive() {
+    let dir = tempfile::tempdir().unwrap();
+    let layout = Layout::new(dir.path());
+    let _first = Supervisor::open(&layout, OpenMode::Strict).unwrap();
+    let started = std::time::Instant::now();
+    let error = Supervisor::open(&layout, OpenMode::Strict).unwrap_err();
+    assert_eq!(
+        error,
+        SupervisorError::Journal(work_supervision_journal::JournalError::Locked)
+    );
+    assert!(
+        started.elapsed() >= std::time::Duration::from_secs(2),
+        "waited the transient-lock bound"
+    );
+}

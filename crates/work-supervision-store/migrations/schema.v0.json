@@ -214,6 +214,72 @@
         }
       ],
       "primary_key": ["id"]
+    },
+    {
+      "name": "worktrees",
+      "columns": [
+        {
+          "name": "mission_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "repository",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "path",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "branch",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "base_commit",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "head",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "delete_branch",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "archive_digest",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "archive_bytes",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "intent_seq",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "updated_seq",
+          "type": "integer",
+          "nullable": false
+        }
+      ],
+      "primary_key": ["mission_id"]
     }
   ]
 }
