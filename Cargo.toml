@@ -4,6 +4,7 @@
 [workspace]
 resolver = "3"
 members = [
+  "crates/work-supervision-domain",
   "crates/work-supervision-journal",
   "crates/work-supervision-journal-verifier",
   "crates/work-supervision-store",

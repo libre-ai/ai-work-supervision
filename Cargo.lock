@@ -352,6 +352,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "work-supervision-domain"
+version = "0.1.0"
+
+[[package]]
 name = "work-supervision-journal"
 version = "0.1.0"
 dependencies = [
@@ -380,6 +384,7 @@ dependencies = [
  "rusqlite",
  "serde_json",
  "tempfile",
+ "work-supervision-domain",
  "work-supervision-journal",
 ]
 
