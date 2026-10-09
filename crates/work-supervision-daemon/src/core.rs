@@ -418,6 +418,7 @@ fn mission_new(shared: &Shared, request: &Value) -> Result<Value, Failure> {
 
 fn mission_list(shared: &Shared) -> Result<Value, Failure> {
     let core = lock(shared)?;
+    let snapshot = crate::coordination::Snapshot::read(&core)?;
     let mut list = Vec::new();
     for mission in core.supervisor.missions()? {
         list.push(json!({
@@ -428,7 +429,7 @@ fn mission_list(shared: &Shared) -> Result<Value, Failure> {
             "worktree": core.worktree_state(mission.id())?,
             "running": core.runs.contains_key(mission.id().as_str()),
             "simulation": is_simulation(&mission),
-            "blockers": crate::coordination::blocker_codes(&core, &mission)?,
+            "blockers": crate::coordination::blocker_codes_in(&core, &mission, &snapshot)?,
         }));
     }
     Ok(Value::Array(list))

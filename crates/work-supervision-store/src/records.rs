@@ -993,6 +993,32 @@ impl Store {
             .map(Some)
     }
 
+    /// Every declared scope, by mission, in one query (missions without a
+    /// declared scope are absent: they cover their whole repository).
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::Sqlite`].
+    pub fn scopes(&self) -> Result<std::collections::HashMap<String, Vec<ScopePath>>, StoreError> {
+        let mut statement = self
+            .connection()
+            .prepare("SELECT mission_id, path FROM mission_scopes ORDER BY mission_id, position")?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut scopes: std::collections::HashMap<String, Vec<ScopePath>> =
+            std::collections::HashMap::new();
+        for (mission, path) in rows {
+            scopes
+                .entry(mission)
+                .or_default()
+                .push(ScopePath::parse(&path).map_err(|_| StoreError::Sqlite)?);
+        }
+        Ok(scopes)
+    }
+
     /// The declared checks of `mission`, by criterion.
     ///
     /// # Errors

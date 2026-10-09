@@ -3,6 +3,7 @@
 //! contract refinements, checks, the guards of a run and an acceptance, the
 //! report, and their recovery steps.
 
+use std::collections::HashMap;
 use std::fs::DirBuilder;
 use std::os::unix::fs::DirBuilderExt as _;
 use std::path::PathBuf;
@@ -486,30 +487,57 @@ fn request_json(row: &RequestRow) -> Value {
 // ------------------------------------------------------------------ guards ---
 
 /// Missions of the same repository holding a worktree whose scope overlaps.
-fn conflicts(core: &Core, mission: &Mission) -> Result<Vec<MissionId>, Failure> {
-    let store = core.supervisor.store();
-    let own = store.scope(mission.id())?;
-    let mut found = Vec::new();
-    for other in core.supervisor.missions()? {
-        if other.id() == mission.id()
-            || other.repository() != mission.repository()
-            || !holds_worktree(other.state())
-        {
-            continue;
-        }
-        if overlaps(&own, &store.scope(other.id())?) {
-            found.push(other.id().clone());
-        }
-    }
-    Ok(found)
+/// What scope conflicts need, read once per request: the missions holding a
+/// worktree, with their repository, and every declared scope. Built in two
+/// queries, so listing the blockers of every mission no longer queries the
+/// scopes of every pair.
+pub(crate) struct Snapshot {
+    holders: Vec<(MissionId, String)>,
+    scopes: HashMap<String, Vec<work_supervision_domain::scope::ScopePath>>,
 }
 
-fn run_blockers_of(core: &Core, mission: &Mission) -> Result<Vec<Blocker>, Failure> {
+impl Snapshot {
+    /// Reads the snapshot of the projection.
+    pub(crate) fn read(core: &Core) -> Result<Self, Failure> {
+        let holders = core
+            .supervisor
+            .missions()?
+            .into_iter()
+            .filter(|mission| holds_worktree(mission.state()))
+            .map(|mission| (mission.id().clone(), mission.repository().to_owned()))
+            .collect();
+        Ok(Self {
+            holders,
+            scopes: core.supervisor.store().scopes()?,
+        })
+    }
+
+    fn scope(&self, mission: &MissionId) -> work_supervision_domain::scope::Scope {
+        self.scopes.get(mission.as_str()).cloned()
+    }
+
+    /// Missions of the same repository holding a worktree whose scope overlaps.
+    fn conflicts(&self, mission: &Mission) -> Vec<MissionId> {
+        let own = self.scope(mission.id());
+        self.holders
+            .iter()
+            .filter(|(id, repository)| id != mission.id() && repository == mission.repository())
+            .filter(|(id, _)| overlaps(&own, &self.scope(id)))
+            .map(|(id, _)| id.clone())
+            .collect()
+    }
+}
+
+fn run_blockers_of(
+    core: &Core,
+    mission: &Mission,
+    snapshot: &Snapshot,
+) -> Result<Vec<Blocker>, Failure> {
     let store = core.supervisor.store();
     Ok(run_blockers(
         &store.dependencies_of(mission.id())?,
         &store.open_requests_of(mission.id())?,
-        &conflicts(core, mission)?,
+        &snapshot.conflicts(mission),
     ))
 }
 
@@ -553,7 +581,7 @@ pub(crate) fn guard_run(core: &Core, mission: &Mission) -> Result<(), Failure> {
     ) {
         return Ok(());
     }
-    match run_blockers_of(core, mission)?.first() {
+    match run_blockers_of(core, mission, &Snapshot::read(core)?)?.first() {
         Some(blocker) => Err(Failure::new(blocker.code())),
         None => Ok(()),
     }
@@ -595,9 +623,18 @@ pub(crate) fn guard_accept(core: &mut Core, mission: &Mission) -> Result<(), Fai
 
 /// The current blockers of a mission, by code, for displays.
 pub(crate) fn blocker_codes(core: &Core, mission: &Mission) -> Result<Vec<&'static str>, Failure> {
+    blocker_codes_in(core, mission, &Snapshot::read(core)?)
+}
+
+/// [`blocker_codes`] against a snapshot read once for many missions.
+pub(crate) fn blocker_codes_in(
+    core: &Core,
+    mission: &Mission,
+    snapshot: &Snapshot,
+) -> Result<Vec<&'static str>, Failure> {
     match mission.state() {
         State::Draft | State::Ready | State::Provisioned | State::Rejected => {
-            Ok(run_blockers_of(core, mission)?
+            Ok(run_blockers_of(core, mission, snapshot)?
                 .iter()
                 .map(Blocker::code)
                 .collect())

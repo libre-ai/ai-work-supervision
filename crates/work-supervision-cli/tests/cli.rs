@@ -628,12 +628,12 @@ fn ws_hook_exits_zero_without_a_usable_root() {
             command.env_remove("WS_ROOT");
         }
         let mut child = command.spawn().unwrap();
-        child
-            .stdin
-            .take()
-            .unwrap()
-            .write_all(payload.as_bytes())
-            .unwrap();
+        // Without a usable root `ws` may exit before reading its input: a
+        // broken pipe is then the expected outcome of the write, not a failure.
+        let written = child.stdin.take().unwrap().write_all(payload.as_bytes());
+        if let Err(error) = written {
+            assert_eq!(error.kind(), std::io::ErrorKind::BrokenPipe, "ws {args:?}");
+        }
         let output = child.wait_with_output().unwrap();
         assert_eq!(output.status.code(), Some(0), "ws {args:?}");
         assert!(output.stdout.is_empty(), "ws {args:?}");
