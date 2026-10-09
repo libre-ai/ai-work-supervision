@@ -1,0 +1,28 @@
+[package]
+name = "work-supervision-journal-verifier"
+description = "Independent verifier of the Work Supervision v0 journal: canonical form and hash chain re-implemented without the writer's code."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "ws-journal-verify"
+path = "src/main.rs"
+
+# Independence is the point of this crate: it must never depend on
+# work-supervision-journal or serde_jcs at run time. The writer appears only as
+# a dev-dependency, so tests can compare the two implementations.
+[dependencies]
+serde_json.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+serde_jcs.workspace = true
+tempfile.workspace = true
+work-supervision-journal = { path = "../work-supervision-journal" }
+
+[lints]
+workspace = true
