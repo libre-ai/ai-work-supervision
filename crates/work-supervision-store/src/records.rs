@@ -296,7 +296,7 @@ impl Supervisor {
     }
 
     /// A session actor must name an active session.
-    fn require_actor(&self, actor: &Actor) -> Result<(), SupervisorError> {
+    pub(crate) fn require_actor(&self, actor: &Actor) -> Result<(), SupervisorError> {
         let state = match actor {
             Actor::Owner => None,
             Actor::Session(id) => self.store().session_state(id)?,

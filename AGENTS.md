@@ -23,6 +23,7 @@ status" section is generated from it — never edit that section by hand.
 - SQLite (`crates/work-supervision-store`) is a projection rebuilt from the
   journal, which never holds free texts (`docs/work-supervision/events-v0.md`).
 - Coordination, harness bridge: `docs/work-supervision/coordination-v0.md`.
+- Phases and approved artifacts: `docs/work-supervision/phases-v0.md`.
 - Recovered code (`apps/missions`, `apps/specifications`, `packages/auth-web`)
   is not product qualification: admission criteria are in the card, not in
   historical documents; `apps/missions` is frozen as the multi-tenant (V6)

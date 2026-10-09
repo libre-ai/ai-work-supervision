@@ -38,6 +38,7 @@
 mod blob;
 mod coordination;
 mod error;
+mod phases;
 mod projection;
 mod records;
 mod schema;
@@ -53,6 +54,7 @@ use work_supervision_journal::{Digest, Entry, Head, Journal, replay};
 
 pub use blob::BlobStore;
 pub use error::StoreError;
+pub use phases::ArtifactRow;
 pub use records::{
     CheckExit, CheckRunRow, CriterionCheck, IdeaRow, OptionRow, RequestRow, ScopeCheckRow,
     SessionRow, TimelineRow,

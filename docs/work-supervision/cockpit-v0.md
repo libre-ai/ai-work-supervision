@@ -18,7 +18,11 @@ the React cockpit of the frozen `apps/missions` is not reused.
   lists deferred ideas and promotes or dismisses the open ones; `/sessions`
   lists declared agent sessions, labelled as declared, never verified. A
   mission page shows its scope, dependencies, checks with their last
-  execution, requests and blockers. Blockers are asked of `wsd` (they depend
+  execution, requests and blockers. With a declared workflow (`phases-v0.md`)
+  it shows each phase's current artifact in full, escaped; a submitted one has
+  an approval form carrying the SHA-256 of the text shown — `wsd` refuses it
+  (`artifact.digest_mismatch`) if the artifact is not that text — and a return
+  form. Blockers are asked of `wsd` (they depend
   on running checks and other worktrees) and shown unknown when it cannot be
   reached.
 - **No bridge from the browser to a terminal**: no route reads a run log, a

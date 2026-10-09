@@ -623,3 +623,94 @@ fn a_decision_request_is_compared_and_answered_at_the_cockpit() {
     );
     assert_eq!(reply.status, 404);
 }
+
+#[test]
+fn an_artifact_is_read_and_approved_at_the_cockpit_by_its_digest() {
+    let mut world = world();
+    let mission = world
+        .client
+        .request(
+            &json!({ "op": "mission.new", "title": "Phased", "repository": "sample",
+                          "brief": "exit 0\n", "criteria": [] }),
+        )
+        .unwrap()["mission"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    world
+        .client
+        .request(&json!({ "op": "mission.workflow", "mission": mission, "phases": ["research"] }))
+        .unwrap();
+    world
+        .client
+        .request(&json!({ "op": "mission.ready", "mission": mission }))
+        .unwrap();
+    let artifact = world
+        .client
+        .request(
+            &json!({ "op": "artifact.submit", "mission": mission, "phase": "research",
+                          "content": "README:1 <script>alert(1)</script>" }),
+        )
+        .unwrap()["artifact"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let http = start(&world.root);
+    let cookie = http.login(&world.root);
+    let page = http.get(&format!("/missions/{mission}"), &cookie);
+    assert_eq!(page.status, 200);
+    assert!(page.body.contains("<h2>Phases</h2>"), "{}", page.body);
+    assert!(
+        page.body
+            .contains("README:1 &lt;script&gt;alert(1)&lt;/script&gt;")
+    );
+    assert!(!page.body.contains("<script>"));
+    assert!(page.body.contains("phase.unapproved"));
+    let digest = world
+        .client
+        .request(&json!({ "op": "artifact.show", "artifact": artifact }))
+        .unwrap()["digest"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(
+        page.body
+            .contains(&format!("name=\"digest\" value=\"{digest}\"")),
+        "the form carries the digest of the text shown"
+    );
+    let token = csrf(&page.body);
+    let path = format!("/artifacts/{artifact}/approve");
+    // A digest that is not the artifact's is refused by wsd.
+    let reply = http.post(
+        &path,
+        &cookie,
+        &format!("csrf={token}&mission={mission}&digest={}", "0".repeat(64)),
+    );
+    assert_eq!(reply.status, 409);
+    assert!(
+        reply.body.contains("artifact.digest_mismatch"),
+        "{}",
+        reply.body
+    );
+    // No mission to come back to, nothing is sent.
+    let reply = http.post(
+        &path,
+        &cookie,
+        &format!("csrf={token}&mission=x&digest={digest}"),
+    );
+    assert_eq!(reply.status, 400);
+    let reply = http.post(
+        &path,
+        &cookie,
+        &format!("csrf={token}&mission={mission}&digest={digest}&reason=checked+the+line"),
+    );
+    assert_eq!(reply.status, 303, "{}", reply.body);
+    let shown = world
+        .client
+        .request(&json!({ "op": "artifact.show", "artifact": artifact }))
+        .unwrap();
+    assert_eq!(shown["state"], "approved");
+    assert_eq!(shown["reason"], "checked the line");
+    let page = http.get(&format!("/missions/{mission}"), &cookie);
+    assert!(!page.body.contains("Approve this text"));
+}

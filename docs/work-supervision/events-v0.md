@@ -5,7 +5,8 @@ the event kinds of Work Supervision v0 and the data each one carries, and how
 the SQLite projection (`crates/work-supervision-store`) applies them. Kinds
 outside this catalogue are refused by the projection
 (`projection.unknown_kind`): a journal written by a newer version is never
-silently half-read.
+silently half-read. The coordination events are catalogued in
+`coordination-v0.md`, the phase and artifact events in `phases-v0.md`.
 
 ## Rules common to every event
 

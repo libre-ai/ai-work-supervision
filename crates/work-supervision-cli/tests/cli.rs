@@ -643,3 +643,134 @@ fn ws_hook_exits_zero_without_a_usable_root() {
         );
     }
 }
+
+#[test]
+fn phases_are_declared_submitted_and_approved_through_the_command_line() {
+    let setup = setup();
+    let mut daemon = start(&setup.root);
+    let root = &setup.root;
+    let brief = setup.base.join("brief.txt");
+    fs::write(&brief, "write-file out.txt done\ncommit add out\nexit 0\n").unwrap();
+    let id = ok(
+        root,
+        &[
+            "mission",
+            "new",
+            "--repository",
+            "sample",
+            "--title",
+            "Phased",
+            "--brief",
+            brief.to_str().unwrap(),
+        ],
+    )["mission"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(
+        refusal(root, &["workflow", &id, "outline", "research"]),
+        "ws: coordination.field_invalid"
+    );
+    ok(root, &["workflow", &id, "research", "outline"]);
+    ok(root, &["mission", "ready", &id]);
+    assert_eq!(refusal(root, &["run", &id]), "ws: phase.unapproved");
+
+    let research = setup.base.join("research.md");
+    fs::write(&research, "# Research\n\nThe repository is empty.\n").unwrap();
+    let artifact = ok(
+        root,
+        &[
+            "artifact",
+            "submit",
+            &id,
+            "research",
+            research.to_str().unwrap(),
+        ],
+    )["artifact"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let shown = ok(root, &["artifact", "show", &artifact]);
+    assert_eq!(shown["content"], "# Research\n\nThe repository is empty.\n");
+    let digest = shown["digest"].as_str().unwrap().to_owned();
+    assert_eq!(
+        refusal(
+            root,
+            &[
+                "artifact",
+                "approve",
+                &artifact,
+                "--digest",
+                &"0".repeat(64)
+            ]
+        ),
+        "ws: artifact.digest_mismatch"
+    );
+    ok(
+        root,
+        &[
+            "artifact", "approve", &artifact, "--digest", &digest, "--reason", "read",
+        ],
+    );
+    let outline = setup.base.join("outline.md");
+    fs::write(&outline, "1. write out.txt <b>now</b>\n").unwrap();
+    let first = ok(
+        root,
+        &[
+            "artifact",
+            "submit",
+            &id,
+            "outline",
+            outline.to_str().unwrap(),
+        ],
+    )["artifact"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    ok(
+        root,
+        &["artifact", "return", &first, "--reason", "name the test"],
+    );
+    let second = ok(
+        root,
+        &[
+            "artifact",
+            "submit",
+            &id,
+            "outline",
+            outline.to_str().unwrap(),
+        ],
+    )["artifact"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let digest = ok(root, &["artifact", "show", &second])["digest"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    ok(root, &["artifact", "approve", &second, "--digest", &digest]);
+    let listed = ok(root, &["artifact", "list", &id]);
+    let states: Vec<&str> = listed
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row["state"].as_str().unwrap())
+        .collect();
+    assert_eq!(states, ["approved", "returned", "approved"]);
+    ok(root, &["run", &id]);
+    let markdown = ws(root, &["report", &id, "--markdown"]);
+    assert!(markdown.status.success());
+    let markdown = String::from_utf8(markdown.stdout).unwrap();
+    assert!(markdown.contains("## Phases"), "{markdown}");
+    assert!(
+        markdown.contains("Governing artifact: **outline**"),
+        "{markdown}"
+    );
+    assert!(
+        markdown.contains("```text\n1. write out.txt <b>now</b>\n```"),
+        "{markdown}"
+    );
+    assert_eq!(ws(root, &["artifact", "list"]).status.code(), Some(2));
+    daemon.kill().unwrap();
+    daemon.wait().unwrap();
+}

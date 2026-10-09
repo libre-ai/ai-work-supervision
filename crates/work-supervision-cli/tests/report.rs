@@ -105,3 +105,32 @@ fn a_report_with_missing_sections_still_renders() {
     assert!(markdown.contains("Scope: undeclared (whole repository)"));
     assert!(markdown.contains("Scope check: none recorded."));
 }
+
+#[test]
+fn phases_render_with_the_governing_artifact_fenced_verbatim() {
+    let mut report = sample();
+    report["phases"] = json!([
+        { "phase": "research", "artifact": { "id": "a1", "state": "approved",
+          "digest": "d1", "submitted_by": "session:s1" } },
+        { "phase": "outline", "artifact": null }
+    ]);
+    report["governing"] = json!({ "phase": "research", "decided_at": "2026-10-09T11:00:00.000Z",
+                                   "content": "uses ``` and <script>x</script>" });
+    let markdown = render(&report);
+    for expected in [
+        "## Phases",
+        "| research | `a1` | approved | `d1` | session:s1 |",
+        "| outline | — | missing | — | — |",
+        "Governing artifact: **research**, approved at 2026-10-09T11:00:00.000Z",
+        "````text\nuses ``` and <script>x</script>\n````",
+    ] {
+        assert!(
+            markdown.contains(expected),
+            "missing {expected:?} in\n{markdown}"
+        );
+    }
+    report["governing"] = serde_json::Value::Null;
+    assert!(render(&report).contains("No phase is approved yet."));
+    report["phases"] = json!([]);
+    assert!(!render(&report).contains("## Phases"));
+}

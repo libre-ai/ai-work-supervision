@@ -72,6 +72,24 @@ pub enum CoordinationRefusal {
     CheckAlreadyDeclared,
     /// The criterion index does not exist.
     CheckCriterionUnknown,
+    /// The mission has a workflow already.
+    WorkflowAlreadyDeclared,
+    /// The mission has no workflow.
+    WorkflowUndeclared,
+    /// The phase is not in the mission's workflow.
+    PhaseUndeclared,
+    /// An earlier declared phase has no approved artifact.
+    PhasePreviousUnapproved,
+    /// Artifacts are submitted once the brief is frozen.
+    ArtifactMissionDraft,
+    /// The mission is terminal.
+    ArtifactMissionClosed,
+    /// No artifact has this identifier.
+    ArtifactNotFound,
+    /// The artifact is not `submitted`.
+    ArtifactNotPending,
+    /// The approved digest is not the artifact's.
+    ArtifactDigestMismatch,
 }
 
 impl CoordinationRefusal {
@@ -97,6 +115,15 @@ impl CoordinationRefusal {
             Self::ScopeAlreadyDeclared => "scope.already_declared",
             Self::CheckAlreadyDeclared => "check.already_declared",
             Self::CheckCriterionUnknown => "check.criterion_unknown",
+            Self::WorkflowAlreadyDeclared => "workflow.already_declared",
+            Self::WorkflowUndeclared => "workflow.undeclared",
+            Self::PhaseUndeclared => "phase.undeclared",
+            Self::PhasePreviousUnapproved => "phase.previous_unapproved",
+            Self::ArtifactMissionDraft => "artifact.mission_draft",
+            Self::ArtifactMissionClosed => "artifact.mission_closed",
+            Self::ArtifactNotFound => "artifact.not_found",
+            Self::ArtifactNotPending => "artifact.not_pending",
+            Self::ArtifactDigestMismatch => "artifact.digest_mismatch",
         }
     }
 }
@@ -1052,6 +1079,8 @@ pub enum Blocker {
     CriteriaUnverified(usize),
     /// Changed files lie outside the declared scope.
     ScopeViolated(u64),
+    /// A declared phase has no approved artifact (`phases-v0.md`).
+    PhaseUnapproved(crate::phases::Phase),
 }
 
 impl Blocker {
@@ -1066,6 +1095,7 @@ impl Blocker {
             Self::CheckRunning => "check.running",
             Self::CriteriaUnverified(_) => "criteria.unverified",
             Self::ScopeViolated(_) => "scope.violated",
+            Self::PhaseUnapproved(_) => "phase.unapproved",
         }
     }
 }

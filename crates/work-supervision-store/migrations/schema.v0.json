@@ -2,6 +2,82 @@
   "schema": "libre-ai.work-supervision.projection.v0",
   "tables": [
     {
+      "name": "artifacts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "mission_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "phase",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "content_digest",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "bytes",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "submitted_by",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "submitted_seq",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "submitted_at",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "reason_digest",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "decided_seq",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "decided_at",
+          "type": "text",
+          "nullable": true
+        }
+      ],
+      "primary_key": ["id"]
+    },
+    {
       "name": "check_runs",
       "columns": [
         {
@@ -302,6 +378,27 @@
         }
       ],
       "primary_key": ["seq"]
+    },
+    {
+      "name": "mission_phases",
+      "columns": [
+        {
+          "name": "mission_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "position",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "phase",
+          "type": "text",
+          "nullable": false
+        }
+      ],
+      "primary_key": ["mission_id", "position"]
     },
     {
       "name": "mission_scopes",

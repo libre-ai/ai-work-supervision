@@ -958,3 +958,239 @@ fn a_commit_made_after_submission_blocks_acceptance_and_stops_the_checks() {
             .contains(&json!("criteria.unverified"))
     );
 }
+
+// ------------------------------------------------------------------ phases ---
+// docs/work-supervision/phases-v0.md
+
+fn submit_artifact(
+    client: &mut Client,
+    mission: &str,
+    phase: &str,
+    content: &str,
+    actor: Option<&str>,
+) -> Result<String, ClientError> {
+    let mut request = json!({ "op": "artifact.submit", "mission": mission, "phase": phase,
+                              "content": content });
+    if let Some(actor) = actor {
+        request["actor"] = json!(actor);
+    }
+    call(client, request).map(|data| data["artifact"].as_str().unwrap().to_owned())
+}
+
+fn refusal(outcome: Result<String, ClientError>) -> String {
+    outcome.unwrap_err().code().to_owned()
+}
+
+fn approve(client: &mut Client, artifact: &str) {
+    let shown = call(
+        client,
+        json!({ "op": "artifact.show", "artifact": artifact }),
+    )
+    .unwrap();
+    call(
+        client,
+        json!({ "op": "artifact.approve", "artifact": artifact, "digest": shown["digest"],
+                "reason": "read in full" }),
+    )
+    .unwrap();
+}
+
+#[test]
+fn declared_phases_hold_the_run_and_the_acceptance_until_each_is_approved() {
+    let fixture = fixture();
+    let daemon = Daemon::start(&fixture.root, None);
+    let mut client = daemon.client();
+    let mission = new_mission(&mut client, &writes("a.txt"), &[]);
+    call(
+        &mut client,
+        json!({ "op": "mission.workflow", "mission": mission, "phases": ["research", "outline"] }),
+    )
+    .unwrap();
+    assert_eq!(
+        refusal(submit_artifact(
+            &mut client,
+            &mission,
+            "research",
+            "early",
+            None
+        )),
+        "artifact.mission_draft"
+    );
+    call(
+        &mut client,
+        json!({ "op": "mission.ready", "mission": mission }),
+    )
+    .unwrap();
+    assert_eq!(
+        code(call(
+            &mut client,
+            json!({ "op": "run", "mission": mission })
+        )),
+        "phase.unapproved"
+    );
+    assert_eq!(
+        show(&mut client, &mission)["blockers"],
+        json!(["phase.unapproved", "phase.unapproved"])
+    );
+
+    // A declared session writes the research; only the owner approves it.
+    let session = call(
+        &mut client,
+        json!({ "op": "session.register", "harness": "pi", "repository": "sample",
+                "mission": mission, "label": "research" }),
+    )
+    .unwrap()["session"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let agent = format!("session:{session}");
+    let research = submit_artifact(
+        &mut client,
+        &mission,
+        "research",
+        "README:1 holds `base`.",
+        Some(&agent),
+    )
+    .unwrap();
+    assert_eq!(
+        refusal(submit_artifact(
+            &mut client,
+            &mission,
+            "outline",
+            "too early",
+            Some(&agent)
+        )),
+        "phase.previous_unapproved"
+    );
+    let shown = call(
+        &mut client,
+        json!({ "op": "artifact.show", "artifact": research }),
+    )
+    .unwrap();
+    assert_eq!(shown["content"], "README:1 holds `base`.");
+    assert_eq!(shown["submitted_by"], agent);
+    assert_eq!(
+        code(call(
+            &mut client,
+            json!({ "op": "artifact.approve", "actor": agent, "artifact": research,
+                    "digest": shown["digest"] })
+        )),
+        "actor.owner_only"
+    );
+    assert_eq!(
+        code(call(
+            &mut client,
+            json!({ "op": "artifact.approve", "artifact": research, "digest": "0".repeat(64) })
+        )),
+        "artifact.digest_mismatch"
+    );
+    approve(&mut client, &research);
+    let outline =
+        submit_artifact(&mut client, &mission, "outline", "one slice: a.txt", None).unwrap();
+    assert_eq!(
+        show(&mut client, &mission)["blockers"],
+        json!(["phase.unapproved"])
+    );
+    approve(&mut client, &outline);
+    assert_eq!(show(&mut client, &mission)["blockers"], json!([]));
+    run_and_submit(&mut client, &fixture.root, &mission);
+
+    // A research revised after the run supersedes both approvals: the result
+    // now stands on an unapproved basis and cannot be accepted.
+    let revised = submit_artifact(
+        &mut client,
+        &mission,
+        "research",
+        "README:1 and a.txt",
+        None,
+    )
+    .unwrap();
+    assert_eq!(code(accept(&mut client, &mission)), "phase.unapproved");
+    let listed = call(
+        &mut client,
+        json!({ "op": "artifact.list", "mission": mission }),
+    )
+    .unwrap();
+    let states: Vec<&str> = listed
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row["state"].as_str().unwrap())
+        .collect();
+    assert_eq!(states, ["submitted", "superseded", "superseded"]);
+    assert!(
+        listed[0].get("content").is_none(),
+        "a listing carries no content"
+    );
+    approve(&mut client, &revised);
+    let outline =
+        submit_artifact(&mut client, &mission, "outline", "one slice: a.txt", None).unwrap();
+    approve(&mut client, &outline);
+
+    let report = call(
+        &mut client,
+        json!({ "op": "mission.report", "mission": mission }),
+    )
+    .unwrap();
+    assert_eq!(report["governing"]["phase"], "outline");
+    assert_eq!(report["governing"]["content"], "one slice: a.txt");
+    assert_eq!(report["phases"].as_array().unwrap().len(), 2);
+    assert!(
+        !report["gaps"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("phase.unapproved"))
+    );
+    accept(&mut client, &mission).unwrap();
+    assert_eq!(
+        refusal(submit_artifact(
+            &mut client,
+            &mission,
+            "research",
+            "late",
+            None
+        )),
+        "artifact.mission_closed"
+    );
+    drop(daemon);
+    assert_journal_and_projection(&fixture.root);
+}
+
+#[test]
+fn a_mission_without_workflow_is_unchanged_and_refuses_artifacts() {
+    let fixture = fixture();
+    let daemon = Daemon::start(&fixture.root, None);
+    let mut client = daemon.client();
+    let mission = new_mission(&mut client, &writes("a.txt"), &[]);
+    call(
+        &mut client,
+        json!({ "op": "mission.ready", "mission": mission }),
+    )
+    .unwrap();
+    assert_eq!(
+        refusal(submit_artifact(
+            &mut client,
+            &mission,
+            "research",
+            "x",
+            None
+        )),
+        "workflow.undeclared"
+    );
+    assert_eq!(
+        code(call(
+            &mut client,
+            json!({ "op": "mission.workflow", "mission": mission, "phases": ["research"] })
+        )),
+        "mission.not_draft"
+    );
+    let report = call(
+        &mut client,
+        json!({ "op": "mission.report", "mission": mission }),
+    )
+    .unwrap();
+    assert_eq!(report["phases"], json!([]));
+    assert_eq!(report["governing"], Value::Null);
+    run_and_submit(&mut client, &fixture.root, &mission);
+    accept(&mut client, &mission).unwrap();
+}

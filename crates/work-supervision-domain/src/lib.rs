@@ -55,9 +55,12 @@
 pub mod coordination;
 mod ids;
 mod model;
+pub mod phases;
 pub mod scope;
 
-pub use ids::{CheckId, CommitId, Digest32, IdeaId, MissionId, RequestId, RunId, SessionId};
+pub use ids::{
+    ArtifactId, CheckId, CommitId, Digest32, IdeaId, MissionId, RequestId, RunId, SessionId,
+};
 pub use model::{
     Budgets, Command, CommandKind, ExecutorProfile, MAX_DURATION_SECONDS, MAX_OUTPUT_BYTES,
     Mission, MissionEvent, MissionParts, MissionResult, Refusal, State, Verdict, branch_of,

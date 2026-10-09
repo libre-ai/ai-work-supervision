@@ -363,6 +363,7 @@ pub(crate) fn handle(shared: &Shared, request: &Value) -> Result<Value, Failure>
             Ok(report_json(&recovered))
         }
         op if crate::coordination::handles(op) => crate::coordination::handle(shared, op, request),
+        op if crate::phases::handles(op) => crate::phases::handle(shared, op, request),
         _ => Err(Failure::new("request.unknown_op")),
     }
 }

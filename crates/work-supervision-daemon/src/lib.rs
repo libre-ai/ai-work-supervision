@@ -20,6 +20,7 @@ mod core;
 mod failure;
 mod fault;
 mod peer;
+mod phases;
 mod protocol;
 mod root;
 mod server;

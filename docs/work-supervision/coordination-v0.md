@@ -99,7 +99,9 @@ Starting a run (`ws run`) is refused, in this order:
 1. `dependency.unsatisfiable` — a dependency was abandoned or cancelled;
 2. `dependency.pending` — a dependency is not accepted yet;
 3. `request.pending` — a decision request on the mission is open;
-4. `scope.conflict` — another mission of the same repository holds a worktree
+4. `phase.unapproved` — a declared phase has no approved artifact
+   (`phases-v0.md`);
+5. `scope.conflict` — another mission of the same repository holds a worktree
    (`provisioned`, `running`, `waiting-input`, `exited`, `result-submitted`,
    `rejected`) and the two scopes overlap. Two scopes overlap when a prefix of
    one covers a prefix of the other; an undeclared scope overlaps everything.
@@ -111,13 +113,14 @@ existing rules:
    (a commit made after the submission, by a check or by code a check ran,
    would otherwise be kept on `ws/<mission>` unverified);
 1. `request.pending`;
-2. `check.running` — checks of the mission are running;
-3. `criteria.unverified` — a criterion carries a check whose last finished
+2. `phase.unapproved` (`phases-v0.md`);
+3. `check.running` — checks of the mission are running;
+4. `criteria.unverified` — a criterion carries a check whose last finished
    execution at the submitted commit is missing or did not exit 0 within its
    budgets;
-4. `scope.violated` — a file changed between the base and the submitted commit
+5. `scope.violated` — a file changed between the base and the submitted commit
    lies outside the declared scope (`scope.checked` with `outside > 0`);
-5. `scope.unchecked` — a scope is declared but no scope check exists at the
+6. `scope.unchecked` — a scope is declared but no scope check exists at the
    submitted commit and none can be computed (the worktree is gone): nothing
    proves the changes stayed inside.
 
@@ -213,7 +216,9 @@ contract; the Markdown form is its rendering for a reader who has not followed
 the history; texts from agents and sessions are escaped there (HTML, link
 syntax), so a renderer that does not sanitise shows them as text. Gap codes: `simulation`, `result.missing`, `criteria.unchecked`
 (criteria without a check), `criteria.unverified`, `scope.undeclared`,
-`scope.violated`, `run.budget_exceeded`, `run.interrupted`, `request.pending`.
+`scope.violated`, `run.budget_exceeded`, `run.interrupted`, `request.pending`,
+`phase.unapproved`. With a declared workflow the report adds `phases` and
+`governing` (`phases-v0.md`).
 
 ## Events
 
