@@ -12,7 +12,7 @@
     "pretest": "bun run check:bun",
     "test": "bun test",
     "check:types": "tsc --noEmit -p tsconfig.json",
-    "test:coverage": "bun test --coverage",
+    "test:coverage": "bun run check:bun && bun test --coverage",
     "precheck:types": "bun run check:bun",
     "pretest:coverage": "bun run check:bun"
   },
