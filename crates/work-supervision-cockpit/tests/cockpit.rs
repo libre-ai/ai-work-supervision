@@ -286,6 +286,10 @@ fn a_decision_taken_at_the_cockpit_is_an_event_of_the_journal() {
         page.body.contains("looked at the diff"),
         "notes are visible"
     );
+    assert!(
+        page.body.contains("Simulation — fake agent"),
+        "a fake-agent mission is labelled a simulation"
+    );
     assert!(page.body.contains("wrote out.txt"));
     let journal = Layout::new(&world.root).journal();
     let before = fs::read_to_string(&journal)

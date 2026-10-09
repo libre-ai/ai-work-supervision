@@ -408,6 +408,7 @@ fn mission_list(shared: &Shared) -> Result<Value, Failure> {
             "revision": mission.revision(),
             "worktree": core.worktree_state(mission.id())?,
             "running": core.runs.contains_key(mission.id().as_str()),
+            "simulation": is_simulation(&mission),
         }));
     }
     Ok(Value::Array(list))
@@ -429,6 +430,7 @@ fn show(core: &Core, mission: &Mission) -> Result<Value, Failure> {
             "max_output_bytes": mission.budgets().max_output_bytes(),
         },
         "executor": mission.executor().as_str(),
+        "simulation": is_simulation(mission),
         "base_commit": mission.base_commit().map(work_supervision_domain::CommitId::as_str),
         "current_run": mission.current_run().map(RunId::as_str),
         "result": mission.result().map(|result| json!({
@@ -798,5 +800,13 @@ pub(crate) fn anchor(shared: &Shared) {
     let outcome = lock(shared).and_then(|mut core| core.anchor());
     if let Err(failure) = outcome {
         eprintln!("wsd: anchor not written: {failure}");
+    }
+}
+
+/// Whether the mission's runs are a simulation: every run of the fake agent is
+/// one, and never counts toward B′ (the v0 exit criterion of the card).
+pub(crate) const fn is_simulation(mission: &Mission) -> bool {
+    match mission.executor() {
+        work_supervision_domain::ExecutorProfile::Fake => true,
     }
 }

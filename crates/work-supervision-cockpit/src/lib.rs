@@ -379,7 +379,7 @@ impl Cockpit {
             return Page::refused(404, "mission.not_found");
         };
         let mut html = format!(
-            "<p><a href=\"/\">All missions</a></p><h1>{title}</h1><dl><dt>State</dt><dd class=\"state\">{state}</dd><dt>Revision</dt><dd>{revision}</dd><dt>Repository</dt><dd>{repository}</dd><dt>Budgets</dt><dd>{duration} s, {output} bytes</dd><dt>Base commit</dt><dd><code>{base}</code></dd></dl><h2>Brief</h2><pre>{brief}</pre><h2>Acceptance criteria</h2><ul>",
+            "<p><a href=\"/\">All missions</a></p><h1>{title}</h1>{badge}<dl><dt>State</dt><dd class=\"state\">{state}</dd><dt>Revision</dt><dd>{revision}</dd><dt>Repository</dt><dd>{repository}</dd><dt>Budgets</dt><dd>{duration} s, {output} bytes</dd><dt>Base commit</dt><dd><code>{base}</code></dd></dl><h2>Brief</h2><pre>{brief}</pre><h2>Acceptance criteria</h2><ul>",
             title = escape(mission.title()),
             state = mission.state().as_str(),
             revision = mission.revision(),
@@ -391,6 +391,7 @@ impl Cockpit {
                 .map(|commit| commit.as_str().to_owned())
                 .unwrap_or_default(),
             brief = escape(mission.brief()),
+            badge = simulation_badge(&mission),
         );
         for criterion in mission.criteria() {
             let _ = write!(html, "<li>{}</li>", escape(criterion));
@@ -460,6 +461,15 @@ impl Cockpit {
         match outcome {
             Ok(_) => Page::redirect(&format!("/missions/{id}")),
             Err(error) => Page::refused(409, error.code()),
+        }
+    }
+}
+
+/// Label of a mission run by the fake agent: a simulation, never B′.
+fn simulation_badge(mission: &work_supervision_domain::Mission) -> &'static str {
+    match mission.executor() {
+        work_supervision_domain::ExecutorProfile::Fake => {
+            "<p class=\"badge\"><strong>Simulation — fake agent.</strong> Runs of this mission do not count toward B′.</p>"
         }
     }
 }
