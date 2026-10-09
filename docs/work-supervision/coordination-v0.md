@@ -52,7 +52,10 @@ Promotion writes three entries: the intent naming the new mission identifier,
 `ws doctor`) an idea left `promoting` is confirmed when its mission exists and
 aborted otherwise, so a crash never leaves a duplicate mission nor an idea
 stuck in `promoting`. The brief of the promoted mission is the idea text unless
-another brief is given.
+another brief is given; its repository is the one given, or the one the idea
+was qualified with (`idea.repository_required` otherwise). The mission is
+validated before the intent is written. Crash points `idea-promotion-intended`
+and `idea-mission-created` (debug builds, `daemon-v0.md`) cover both windows.
 
 ## Decision requests — structured arbitration
 
@@ -110,7 +113,13 @@ existing rules:
    execution at the submitted commit is missing or did not exit 0 within its
    budgets;
 4. `scope.violated` — a file changed between the base and the submitted commit
-   lies outside the declared scope (`scope.checked` with `outside > 0`).
+   lies outside the declared scope (`scope.checked` with `outside > 0`);
+5. `scope.unchecked` — a scope is declared but no scope check exists at the
+   submitted commit and none can be computed (the worktree is gone): nothing
+   proves the changes stayed inside.
+
+While checks of a mission run, every decision on it is refused
+(`check.running`): a decision could release the worktree under them.
 
 `ws mission show` and the cockpit list the current blockers of each mission
 with these codes, so a blocked mission says what it waits for.
@@ -126,16 +135,20 @@ first.
 
 ## Checks — verified criteria
 
-`ws check <id>` runs, for a mission in `result-submitted` whose worktree is
-clean and at the submitted commit (`check.worktree_changed` otherwise), every
-declared check one after the other, on a thread of the daemon. Each execution
+`ws check <id>` runs, for a mission in `result-submitted`
+(`check.not_submitted` otherwise) with at least one declared check
+(`check.none_declared`) whose worktree is clean and at the submitted commit
+(`check.worktree_changed` otherwise), every declared check one after the
+other, on a thread of the daemon. A program that cannot be started is
+recorded as a finished execution without exit code: it never passes. Each execution
 uses the run machinery (`pty-v0.md`): a fresh terminal in the worktree, an
 environment cleared down to `HOME` (inside the root), `LANG`, `PATH` (the
 configured one), `SHELL` and `TERM`, the mission's budgets, its group killed at
 the end, its output in `runs/<check>/pty.log`. Events: `check.started`
 (check, criterion, commit, digest of the argument vector) and `check.finished`
 (exit code or signal, bytes, output digest, overrun budget); a check left
-started by a dead daemon is recorded `check.interrupted` at start.
+started by a dead daemon is recorded `check.interrupted` at start (crash point
+`check-started`), and an interrupted execution never passes.
 
 A check executes what the worktree contains with the user's rights, exactly as
 the owner running the same command by hand would; it is not confined until C0
@@ -163,9 +176,11 @@ identifier itself). A report carries a state (`working`, `waiting-input`,
 computed at read time; a session silent for more than 15 minutes is shown
 `silent`, never inferred as ended.
 
-`ws hook <harness> <event>` translates a harness's own hook payload, read on
-standard input, into these operations; the per-harness wiring is in
-`harness-adapters-v0.md`.
+`ws hook <harness>` translates a harness's own hook payload, read on standard
+input (or given as its last argument), into these operations; the per-harness
+wiring is in `harness-adapters-v0.md`. The open decision requests of every
+mission are listed by the operation `decisions.pending` (`ws request list
+--open`), so a supervisor asks one question to know what waits for the owner.
 
 ## Report
 

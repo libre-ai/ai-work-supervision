@@ -12,6 +12,15 @@ the React cockpit of the frozen `apps/missions` is not reused.
   output bytes and digest, inputs, exit) and notes.
 - Writes only through `wsd`: a decision (`accept`, `reject`, `abandon`,
   `cancel`, with a reason) and a note, journalled as `ws decide` / `ws note`.
+- Coordination (`coordination-v0.md`): `/decisions` shows the open decision
+  requests with their options side by side — label, consequence,
+  reversibility, recommendation — and answers or withdraws them; `/ideas`
+  lists deferred ideas and promotes or dismisses the open ones; `/sessions`
+  lists declared agent sessions, labelled as declared, never verified. A
+  mission page shows its scope, dependencies, checks with their last
+  execution, requests and blockers. Blockers are asked of `wsd` (they depend
+  on running checks and other worktrees) and shown unknown when it cannot be
+  reached.
 - **No bridge from the browser to a terminal**: no route reads a run log, a
   PTY or sends input; no page contains terminal output (tested with an output
   marker that only the agent's terminal holds).
