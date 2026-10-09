@@ -566,12 +566,25 @@ pub(crate) fn guard_accept(core: &mut Core, mission: &Mission) -> Result<(), Fai
         return Ok(());
     }
     if let Some(result) = mission.result() {
+        // The branch kept on acceptance must be the commit the checks and the
+        // scope check examined: a commit made after the submission (by a check,
+        // or by code a check ran) would be kept unverified.
+        if core.worktree_state(mission.id())?.as_deref() == Some("created") {
+            let head = core
+                .worktrees
+                .head_of(&core.worktrees.path_of(mission.id().as_str()))?;
+            if head != *result.commit() {
+                return Err(Failure::new("worktree.head_moved"));
+            }
+        }
         let recorded = core
             .supervisor
             .store()
             .scope_check(mission.id(), result.commit().as_str())?;
         if recorded.is_none() {
-            record_scope_check(core, mission.id())?;
+            // A failure leaves no record: a declared scope then blocks with
+            // `scope.unchecked` below, an undeclared one has nothing to check.
+            let _ = record_scope_check(core, mission.id());
         }
     }
     match accept_blockers_of(core, mission)?.first() {
@@ -666,7 +679,11 @@ fn run_checks(shared: &Shared, id: &MissionId) -> Result<Value, Failure> {
                 &check.argv,
                 &check.argv_digest,
             ) {
+                // The remaining checks are not run: their criteria stay
+                // unverified, which blocks the acceptance.
                 eprintln!("wsd: check refused: {failure}");
+                crate::core::anchor(&thread_shared);
+                break;
             }
             crate::core::anchor(&thread_shared);
         }
@@ -693,15 +710,19 @@ fn run_one_check(
     let check = CheckId::from_bytes(random_bytes()?);
     let session = {
         let mut core = lock(shared)?;
-        core.supervisor.check_started(
-            mission,
-            &check,
-            criterion,
-            commit,
-            argv_digest,
-            clock::now()?,
-        )?;
-        fault::hit("check-started");
+        // Every check runs on the submitted commit, clean: a previous check
+        // (or the code it ran) may have committed or written in the worktree.
+        let at_commit = core.worktree_state(mission)?.as_deref() == Some("created")
+            && core.worktrees.is_clean(mission)?
+            && core
+                .worktrees
+                .head_of(&core.worktrees.path_of(mission.as_str()))?
+                == *commit;
+        if !at_commit {
+            return Err(Failure::new("check.worktree_changed"));
+        }
+        // Everything that can fail is prepared before `check.started`, so the
+        // journal never holds a start without its end but for a crash.
         let directory = core.layout.runs().join(check.as_str());
         let home = directory.join("home");
         DirBuilder::new()
@@ -711,6 +732,15 @@ fn run_one_check(
             .map_err(|_| Failure::new("run.io"))?;
         let budgets = core.mission(mission)?.budgets();
         let (program, arguments) = argv.split_first().ok_or(Failure::new("check.invalid"))?;
+        core.supervisor.check_started(
+            mission,
+            &check,
+            criterion,
+            commit,
+            argv_digest,
+            clock::now()?,
+        )?;
+        fault::hit("check-started");
         let spec = SpawnSpec::new(
             PathBuf::from(program),
             arguments.iter().map(Into::into).collect(),
@@ -802,6 +832,21 @@ pub(crate) fn mission_extras(core: &Core, mission: &Mission) -> Result<Value, Fa
     }))
 }
 
+/// Whether the last finished execution of the check of `criterion` passed at
+/// the submitted commit: the rule of `accept_blockers`, applied to rows.
+fn verified(
+    rows: &[work_supervision_store::CheckRunRow],
+    criterion: usize,
+    submitted: Option<&str>,
+) -> bool {
+    rows.iter()
+        .rev()
+        .find(|row| {
+            row.state == "finished" && usize::try_from(row.criterion).ok() == Some(criterion)
+        })
+        .is_some_and(|row| Some(row.commit.as_str()) == submitted && row.passed())
+}
+
 /// The self-standing report of a mission (`ws report`): what was asked, what
 /// was done, the evidence, the gaps, the decisions and the timeline.
 pub(crate) fn report(core: &Core, mission: &Mission) -> Result<Value, Failure> {
@@ -833,6 +878,7 @@ pub(crate) fn report(core: &Core, mission: &Mission) -> Result<Value, Failure> {
                 "index": position,
                 "text": text,
                 "check": check.map(|check| json!({ "argv": check.argv })),
+                "verified": check.map(|_| verified(&check_runs, position, submitted.as_deref())),
                 "last_execution": last.map(|row| json!({
                     "commit": row.commit,
                     "state": row.state,
@@ -856,13 +902,10 @@ pub(crate) fn report(core: &Core, mission: &Mission) -> Result<Value, Failure> {
     if checks.len() < mission.criteria().len() {
         gaps.push("criteria.unchecked");
     }
-    let unverified = checks.iter().any(|check| {
-        !check_runs.iter().rev().any(|row| {
-            usize::try_from(row.criterion).ok() == Some(check.criterion)
-                && Some(&row.commit) == submitted.as_ref()
-                && row.passed()
-        })
-    });
+    // Same rule as the acceptance guard: the last finished execution decides.
+    let unverified = checks
+        .iter()
+        .any(|check| !verified(&check_runs, check.criterion, submitted.as_deref()));
     if unverified {
         gaps.push("criteria.unverified");
     }
@@ -1041,8 +1084,13 @@ pub(crate) fn recover(core: &mut Core, recovered: &mut Recovered) -> Result<(), 
         {
             continue;
         }
-        if record_scope_check(core, mission.id())?.is_some() {
-            recovered.scope_checks += 1;
+        // A scope check that fails here is counted, never propagated: it must
+        // not keep the daemon from starting. Acceptance then reports
+        // `scope.unchecked` for a declared scope.
+        match record_scope_check(core, mission.id()) {
+            Ok(Some(_)) => recovered.scope_checks += 1,
+            Ok(None) => {}
+            Err(_) => recovered.scope_check_failures += 1,
         }
     }
     Ok(())

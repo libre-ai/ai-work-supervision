@@ -65,8 +65,28 @@ enum Exit {
     Code(u8),
 }
 
+/// Whether the command is `ws [--root <dir>] hook …`, recognised before any
+/// validation: a hook must exit 0 whatever is wrong (Claude Code reads exit
+/// code 2 as "block the prompt or the stop").
+fn is_hook(arguments: &[OsString]) -> bool {
+    match arguments {
+        [first, ..] if first == "hook" => true,
+        [flag, _, third, ..] if flag == "--root" => third == "hook",
+        _ => false,
+    }
+}
+
 fn main() -> ExitCode {
-    match run(std::env::args_os().skip(1).collect()) {
+    let arguments: Vec<OsString> = std::env::args_os().skip(1).collect();
+    if is_hook(&arguments) {
+        match run(arguments) {
+            Ok(_) | Err(Exit::Code(_)) => {}
+            Err(Exit::Usage) => eprintln!("ws: hook usage"),
+            Err(Exit::Refused(code)) => eprintln!("ws: hook {code}"),
+        }
+        return ExitCode::SUCCESS;
+    }
+    match run(arguments) {
         Ok(Value::Null) => ExitCode::SUCCESS,
         Ok(value) => {
             match serde_json::to_string_pretty(&value) {
@@ -429,8 +449,14 @@ fn context_of(layout: &Layout, cwd: Option<&str>) -> (Option<String>, Option<Str
     let Some(cwd) = cwd else {
         return (None, None);
     };
-    let mission = Path::new(cwd)
-        .strip_prefix(layout.worktrees())
+    // Compare resolved paths: on macOS `/var/…` and `/private/var/…` name the
+    // same directory, and a harness may report either.
+    let resolve = |path: &Path| fs::canonicalize(path).unwrap_or_else(|_| path.to_owned());
+    let cwd_path = resolve(Path::new(cwd));
+    let cwd = cwd_path.to_string_lossy().into_owned();
+    let cwd = cwd.as_str();
+    let mission = cwd_path
+        .strip_prefix(resolve(&layout.worktrees()))
         .ok()
         .and_then(|rest| rest.components().next())
         .and_then(|first| first.as_os_str().to_str())
@@ -441,9 +467,14 @@ fn context_of(layout: &Layout, cwd: Option<&str>) -> (Option<String>, Option<Str
                     .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
         })
         .map(str::to_owned);
-    let repository = Config::load(&layout.config())
-        .ok()
-        .and_then(|config| work_supervision_cli::hook::repository_of(cwd, &config.repositories()));
+    let repository = Config::load(&layout.config()).ok().and_then(|config| {
+        let repositories: Vec<(String, PathBuf)> = config
+            .repositories()
+            .into_iter()
+            .map(|(name, path)| (name, resolve(&path)))
+            .collect();
+        work_supervision_cli::hook::repository_of(cwd, &repositories)
+    });
     (repository, mission)
 }
 

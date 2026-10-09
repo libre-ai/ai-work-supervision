@@ -675,10 +675,10 @@ impl Cockpit {
         let executions = store.check_runs(&mission_id).unwrap_or_default();
         for (position, criterion) in mission.criteria().iter().enumerate() {
             let check = checks.iter().find(|check| check.criterion == position);
-            let last = executions
-                .iter()
-                .rev()
-                .find(|row| usize::try_from(row.criterion).ok() == Some(position));
+            // The last finished execution decides, as for the acceptance guard.
+            let last = executions.iter().rev().find(|row| {
+                row.state == "finished" && usize::try_from(row.criterion).ok() == Some(position)
+            });
             let verification = match (check, last) {
                 (None, _) => " <small>(no check)</small>".to_owned(),
                 (Some(check), None) => format!(

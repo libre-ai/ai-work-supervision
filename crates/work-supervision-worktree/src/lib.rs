@@ -399,11 +399,13 @@ impl Worktrees {
 
     /// Paths changed between `base` and `head`, seen from the worktree of
     /// `mission` (`git diff --name-only -z --no-renames`): a rename lists both
-    /// its old and its new path, so moving a file out of a scope is seen.
+    /// its old and its new path, so moving a file out of a scope is seen. A
+    /// path that is not UTF-8 is kept, its invalid bytes replaced by U+FFFD:
+    /// an agent's file name must never make the check, or a restart, fail.
     ///
     /// # Errors
     ///
-    /// [`WorktreeError::Git`], including a path that is not UTF-8.
+    /// [`WorktreeError::Git`].
     pub fn changed_paths(
         &self,
         mission: &MissionId,
@@ -421,11 +423,11 @@ impl Worktrees {
                 head.as_str(),
             ],
         )?;
-        output
+        Ok(output
             .split(|byte| *byte == 0)
             .filter(|path| !path.is_empty())
-            .map(|path| String::from_utf8(path.to_vec()).map_err(|_| WorktreeError::Git))
-            .collect()
+            .map(|path| String::from_utf8_lossy(path).into_owned())
+            .collect())
     }
 
     /// Whether the worktree of `mission` has neither changes nor untracked files.

@@ -601,3 +601,45 @@ fn ws_hook_follows_a_claude_code_session_and_writes_nothing_on_standard_output()
     assert!(output.stdout.is_empty());
     assert!(String::from_utf8_lossy(&output.stderr).starts_with("ws: hook "));
 }
+
+/// Exit code 2 blocks a prompt or a stop in Claude Code: whatever is wrong
+/// with the root, `ws hook` exits 0 and writes nothing on standard output.
+#[test]
+fn ws_hook_exits_zero_without_a_usable_root() {
+    use std::io::Write as _;
+    let payload = r#"{"hook_event_name": "Stop", "session_id": "s", "cwd": "/"}"#;
+    let cases: [(&[&str], bool); 4] = [
+        (&["--root", "", "hook", "claude-code"], false),
+        (&["hook", "claude-code"], true),
+        (&["--root", "relative/root", "hook", "claude-code"], false),
+        (
+            &["--root", "/nonexistent/ws-root", "hook", "claude-code"],
+            false,
+        ),
+    ];
+    for (args, clear_root) in cases {
+        let mut command = Process::new(WS);
+        command
+            .args(args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        if clear_root {
+            command.env_remove("WS_ROOT");
+        }
+        let mut child = command.spawn().unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(payload.as_bytes())
+            .unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert_eq!(output.status.code(), Some(0), "ws {args:?}");
+        assert!(output.stdout.is_empty(), "ws {args:?}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr).starts_with("ws: hook "),
+            "ws {args:?}"
+        );
+    }
+}

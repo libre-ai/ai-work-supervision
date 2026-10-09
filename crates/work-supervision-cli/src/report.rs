@@ -16,9 +16,25 @@ fn text(value: &Value) -> String {
     }
 }
 
-/// Escapes a text for a Markdown table cell or a list item.
+/// Escapes a text for a Markdown table cell or a list item. Texts come from
+/// agents and sessions: raw HTML and link syntax are neutralised, so a
+/// renderer that does not sanitise shows them as text.
 fn cell(value: &Value) -> String {
-    text(value).replace('|', "\\|").replace('\n', " ")
+    let mut escaped = String::new();
+    for character in text(value).chars() {
+        match character {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '|' | '[' | ']' | '`' => {
+                escaped.push('\\');
+                escaped.push(character);
+            }
+            '\n' | '\r' => escaped.push(' '),
+            other => escaped.push(other),
+        }
+    }
+    escaped
 }
 
 fn list(value: &Value) -> &[Value] {
@@ -159,7 +175,7 @@ pub fn render(report: &Value) -> String {
     if result.is_null() {
         let _ = writeln!(out, "No result submitted.");
     } else {
-        let _ = writeln!(out, "{}", text(&result["summary"]));
+        let _ = writeln!(out, "{}", cell(&result["summary"]));
         let _ = writeln!(
             out,
             "\nCommit `{}` · evidence `{}`",

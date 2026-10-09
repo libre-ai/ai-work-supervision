@@ -82,6 +82,22 @@ fn a_report_renders_every_section_a_reader_needs() {
 }
 
 #[test]
+fn texts_from_agents_cannot_inject_html_or_links() {
+    let mut report = sample();
+    report["result"]["summary"] =
+        json!("done <img src=x onerror=alert(1)> [click](javascript:alert(1))");
+    report["notes"] = json!([{ "text": "<script>x</script>", "at": "t" }]);
+    let markdown = render(&report);
+    assert!(!markdown.contains("<img"));
+    assert!(!markdown.contains("<script>"));
+    assert!(!markdown.contains("[click](javascript"));
+    assert!(
+        markdown
+            .contains("done &lt;img src=x onerror=alert(1)&gt; \\[click\\](javascript:alert(1))")
+    );
+}
+
+#[test]
 fn a_report_with_missing_sections_still_renders() {
     let markdown = render(&json!({ "mission": { "title": "Empty" } }));
     assert!(markdown.contains("# Empty"));

@@ -107,6 +107,9 @@ Starting a run (`ws run`) is refused, in this order:
 Accepting (`ws decide <id> accept`) is refused, in this order, besides the
 existing rules:
 
+0. `worktree.head_moved` — the worktree's HEAD is not the submitted commit
+   (a commit made after the submission, by a check or by code a check ran,
+   would otherwise be kept on `ws/<mission>` unverified);
 1. `request.pending`;
 2. `check.running` — checks of the mission are running;
 3. `criteria.unverified` — a criterion carries a check whose last finished
@@ -131,7 +134,15 @@ base commit and the submitted commit (`git diff --name-only -z`) and appends
 `scope.checked` with the commit, the number of changed paths, the number
 outside the scope and the digest of the list of outside paths (a blob). When a
 crash leaves a submitted result without its check, acceptance computes it
-first.
+first. A path that is not UTF-8 is kept with its invalid bytes replaced. A
+scope check that fails never undoes a journalled submission (the response
+carries `scope_check_failed`) and never stops a restart (`ws doctor` counts
+`scope_checks_failed`); a declared scope then blocks with `scope.unchecked`.
+
+Known limit: `mission.list` computes the blockers of every mission, and a
+scope conflict compares a mission with every other one, under the daemon's
+lock — quadratic in the number of missions, acceptable for a single-user
+root, to revisit before the multi-tenant phase.
 
 ## Checks — verified criteria
 
@@ -140,7 +151,14 @@ first.
 (`check.none_declared`) whose worktree is clean and at the submitted commit
 (`check.worktree_changed` otherwise), every declared check one after the
 other, on a thread of the daemon. A program that cannot be started is
-recorded as a finished execution without exit code: it never passes. Each execution
+recorded as a finished execution without exit code: it never passes. Before
+each check the worktree must still be clean and at the submitted commit;
+otherwise the series stops, nothing more is journalled, and the remaining
+criteria stay unverified. Everything that can fail is prepared before
+`check.started`, so only a crash leaves a start without its end. A criterion
+is verified when the **last finished** execution of its check passed at the
+submitted commit — the same rule for the guard, `ws report` (`verified` per
+criterion) and the cockpit. Each execution
 uses the run machinery (`pty-v0.md`): a fresh terminal in the worktree, an
 environment cleared down to `HOME` (inside the root), `LANG`, `PATH` (the
 configured one), `SHELL` and `TERM`, the mission's budgets, its group killed at
@@ -191,7 +209,8 @@ executions at the submitted commit), the gaps (codes, below), the decisions
 (requests and their answers, verdict), the blockers and a timeline (sequence,
 instant and kind of every journal entry of the mission). The JSON form is the
 contract; the Markdown form is its rendering for a reader who has not followed
-the history. Gap codes: `simulation`, `result.missing`, `criteria.unchecked`
+the history; texts from agents and sessions are escaped there (HTML, link
+syntax), so a renderer that does not sanitise shows them as text. Gap codes: `simulation`, `result.missing`, `criteria.unchecked`
 (criteria without a check), `criteria.unverified`, `scope.undeclared`,
 `scope.violated`, `run.budget_exceeded`, `run.interrupted`, `request.pending`.
 

@@ -812,3 +812,149 @@ fn a_hooked_session_is_found_by_its_harness_identifier_digest_only() {
     assert_eq!(listed[0]["silent"], false);
     assert_eq!(listed[0]["state"], "active");
 }
+
+/// Git on the host `PATH`, as an absolute path a check can be given.
+fn host_git_program() -> PathBuf {
+    std::env::split_paths(&std::env::var_os("PATH").unwrap())
+        .map(|directory| directory.join("git"))
+        .find(|candidate| candidate.is_file())
+        .unwrap()
+}
+
+/// Runs git with raw byte arguments in `dir` (paths that are not UTF-8).
+fn raw_git(dir: &Path, args: &[&[u8]]) -> String {
+    use std::os::unix::ffi::OsStrExt as _;
+    let output = Process::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args.iter().map(|arg| std::ffi::OsStr::from_bytes(arg)))
+        .env_clear()
+        .env("PATH", std::env::var_os("PATH").unwrap())
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "git {:?}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8_lossy(&output.stdout).trim().to_owned()
+}
+
+#[test]
+fn a_path_that_is_not_utf8_never_blocks_submission_restart_or_acceptance() {
+    let fixture = fixture();
+    let mission = {
+        let daemon = Daemon::start(&fixture.root, None);
+        let mut client = daemon.client();
+        let mission = new_mission(&mut client, &writes("a.txt"), &[]);
+        call(
+            &mut client,
+            json!({ "op": "mission.ready", "mission": mission }),
+        )
+        .unwrap();
+        call(&mut client, json!({ "op": "run", "mission": mission })).unwrap();
+        wait_state(&mut client, &mission, &["exited"]);
+        // The agent's commit adds a file whose name is not UTF-8 (plumbing,
+        // since the file system may refuse the name), kept out of the
+        // working tree so the worktree stays clean.
+        let worktree = fixture.root.join("worktrees").join(&mission);
+        let blob = raw_git(&worktree, &[b"hash-object", b"-w", b"/dev/null"]);
+        let entry = format!("100644,{blob},").into_bytes();
+        let mut entry = entry;
+        entry.extend_from_slice(b"bad\xffname");
+        raw_git(
+            &worktree,
+            &[b"update-index", b"--add", b"--cacheinfo", &entry],
+        );
+        raw_git(
+            &worktree,
+            &[
+                b"-c",
+                b"user.name=a",
+                b"-c",
+                b"user.email=a@example.invalid",
+                b"commit",
+                b"-q",
+                b"-m",
+                b"odd name",
+            ],
+        );
+        raw_git(
+            &worktree,
+            &[b"update-index", b"--skip-worktree", b"bad\xffname"],
+        );
+        let submitted = call(
+            &mut client,
+            json!({ "op": "result.submit", "mission": mission, "evidence_digest": evidence(&fixture.root), "summary": "done" }),
+        )
+        .unwrap();
+        // Two changed paths, none outside an undeclared scope, no failure.
+        assert_eq!(submitted["scope_outside"], 0);
+        assert!(submitted.get("scope_check_failed").is_none(), "{submitted}");
+        mission
+    };
+    // The daemon restarts, and the mission can be accepted.
+    let daemon = Daemon::start(&fixture.root, None);
+    let mut client = daemon.client();
+    let report = call(
+        &mut client,
+        json!({ "op": "mission.report", "mission": mission }),
+    )
+    .unwrap();
+    assert_eq!(report["evidence"]["scope_check"]["changed"], 2);
+    accept(&mut client, &mission).unwrap();
+}
+
+#[test]
+fn a_commit_made_after_submission_blocks_acceptance_and_stops_the_checks() {
+    let fixture = fixture();
+    let daemon = Daemon::start(&fixture.root, None);
+    let mut client = daemon.client();
+    let mission = new_mission(
+        &mut client,
+        &writes("r.txt"),
+        &["a check that commits", "a check that would pass"],
+    );
+    let git = host_git_program();
+    call(
+        &mut client,
+        json!({ "op": "mission.check", "mission": mission, "criterion": 0,
+                "argv": [git, "-c", "user.name=c", "-c", "user.email=c@example.invalid",
+                         "commit", "-q", "--allow-empty", "-m", "injected after submission"] }),
+    )
+    .unwrap();
+    call(
+        &mut client,
+        json!({ "op": "mission.check", "mission": mission, "criterion": 1,
+                "argv": ["/bin/sh", "-c", "exit 0"] }),
+    )
+    .unwrap();
+    run_and_submit(&mut client, &fixture.root, &mission);
+    call(
+        &mut client,
+        json!({ "op": "check.run", "mission": mission }),
+    )
+    .unwrap();
+    wait_checks(&mut client, &mission);
+    // The first check moved HEAD: the second never ran on a moved tree.
+    let runs = show(&mut client, &mission)["check_runs"]
+        .as_array()
+        .unwrap()
+        .len();
+    assert_eq!(runs, 1);
+    assert_eq!(code(accept(&mut client, &mission)), "worktree.head_moved");
+    let report = call(
+        &mut client,
+        json!({ "op": "mission.report", "mission": mission }),
+    )
+    .unwrap();
+    assert_eq!(report["intent"]["criteria"][1]["verified"], false);
+    assert!(
+        report["gaps"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("criteria.unverified"))
+    );
+}

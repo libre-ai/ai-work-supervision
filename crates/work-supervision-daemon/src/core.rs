@@ -62,6 +62,7 @@ pub(crate) struct Recovered {
     pub(crate) promotions_confirmed: u64,
     pub(crate) promotions_aborted: u64,
     pub(crate) scope_checks: u64,
+    pub(crate) scope_check_failures: u64,
 }
 
 pub(crate) fn lock(shared: &Shared) -> Result<MutexGuard<'_, Core>, Failure> {
@@ -380,6 +381,7 @@ pub(crate) fn report_json(recovered: &Recovered) -> Value {
         "promotions_confirmed": recovered.promotions_confirmed,
         "promotions_aborted": recovered.promotions_aborted,
         "scope_checks_recorded": recovered.scope_checks,
+        "scope_checks_failed": recovered.scope_check_failures,
     })
 }
 
@@ -743,20 +745,30 @@ fn submit(shared: &Shared, request: &Value) -> Result<Value, Failure> {
         },
     )?;
     fault::hit("result-submitted");
-    let outside = crate::coordination::record_scope_check(&mut core, &id)?;
-    Ok(json!({ "scope_outside": outside }))
+    // The result is journalled: a failing scope check is reported, not
+    // returned as a refusal of a submission that took place.
+    match crate::coordination::record_scope_check(&mut core, &id) {
+        Ok(outside) => Ok(json!({ "scope_outside": outside })),
+        Err(failure) => Ok(json!({ "scope_outside": null, "scope_check_failed": failure.code() })),
+    }
 }
 
 fn decide(shared: &Shared, request: &Value) -> Result<Value, Failure> {
     let id = mission_field(request)?;
     let reason = field(request, "reason")?.to_owned();
-    if lock(shared)?.checks.contains_key(id.as_str()) {
-        // A decision while checks run would race their worktree.
-        return Err(Failure::new("check.running"));
-    }
+    // A decision while checks run would race their worktree: the test is made
+    // under the very lock that executes the decision, never before it.
+    let idle = |core: &Core| {
+        if core.checks.contains_key(id.as_str()) {
+            Err(Failure::new("check.running"))
+        } else {
+            Ok(())
+        }
+    };
     match field(request, "decision")? {
         "accept" => {
             let mut core = lock(shared)?;
+            idle(&core)?;
             let mission = core.mission(&id)?;
             crate::coordination::guard_accept(&mut core, &mission)?;
             if core.worktree_state(&id)?.as_deref() == Some("created")
@@ -770,11 +782,14 @@ fn decide(shared: &Shared, request: &Value) -> Result<Value, Failure> {
             Ok(json!({ "state": mission.state().as_str() }))
         }
         "reject" => {
-            let mission = lock(shared)?.execute(&id, &Command::Reject { reason })?;
+            let mut core = lock(shared)?;
+            idle(&core)?;
+            let mission = core.execute(&id, &Command::Reject { reason })?;
             Ok(json!({ "state": mission.state().as_str() }))
         }
         "abandon" => {
             let mut core = lock(shared)?;
+            idle(&core)?;
             let mission = core.execute(&id, &Command::Abandon { reason })?;
             core.release(&mission, Release::Abandon)?;
             Ok(json!({ "state": mission.state().as_str() }))
@@ -794,6 +809,7 @@ fn decide(shared: &Shared, request: &Value) -> Result<Value, Failure> {
                     .map_err(|_| Failure::new("run.supervisor_failed"))?;
             }
             let mut core = lock(shared)?;
+            idle(&core)?;
             let mission = core.execute(&id, &Command::Cancel { reason })?;
             core.release(&mission, Release::Abandon)?;
             Ok(json!({ "state": mission.state().as_str() }))
