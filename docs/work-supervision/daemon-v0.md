@@ -65,3 +65,20 @@ verify` exits 0 / 1 / 2 / 3 like `ws-journal-verify`. `ws rebuild [--check]`
 refuses while the daemon runs (`daemon.running`), rebuilds the projection from
 the journal and the blobs, reports whether it equals the live one, and (without
 `--check`) replaces it, keeping the previous one as `state.sqlite.previous`.
+
+## Head anchoring
+
+The hash chain cannot see a complete, consistent rewrite of the journal. With
+`[anchor] path = "<file outside the root>"` in the configuration, `wsd`
+records the head (`seq` + digest, one JSON line, schema
+`libre-ai.work-supervision.anchor.v0`, mode 0600, atomic rename) after every
+request and every run event. At start, after the independent verification and
+before opening the writer, it refuses:
+
+- a journal whose entry at the anchored `seq` is missing or has another digest
+  (`journal.anchor_mismatch`) — shorter, longer or same-length rewrites alike;
+- a written journal without its anchor (`journal.anchor_missing`);
+- an anchor path inside the root (`config.anchor_inside_root`).
+
+`ws journal verify` reports the anchor (`matched`, `not-configured`) and exits 1
+on a mismatch or a missing anchor.
