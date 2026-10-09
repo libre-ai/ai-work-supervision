@@ -19,11 +19,35 @@
 //! ws journal verify | head
 //! ws doctor
 //! ws rebuild [--check]                (daemon stopped)
+//!
+//! Coordination (docs/work-supervision/coordination-v0.md):
+//! ws mission depend <id> --on <id>
+//! ws mission scope <id> <path>…
+//! ws mission check <id> <criterion> -- <program> [<argument>…]
+//! ws check <id>                       (runs the declared checks)
+//! ws report <id> [--markdown]
+//! ws idea add <text> [--session <id>]
+//! ws idea qualify <id> [--repository <r>] [--mission <id>] [--context <c>] [--session <id>]
+//! ws idea promote <id> --title <t> [--repository <r>] [--brief <file>] [--criterion <c>]…
+//! ws idea dismiss <id> --reason <r>
+//! ws idea list
+//! ws request open --question <q> --option <reversibility>:<label>:<consequence>…
+//!                 [--mission <id>] [--recommended <n>] [--session <id>]
+//! ws request answer <id> <choice> --reason <r>
+//! ws request withdraw <id> --reason <r> [--session <id>]
+//! ws request list [--open]
+//! ws session register --harness <h> --label <l> [--repository <r>] [--mission <id>]
+//! ws session report <id> <state> [--note <n>]
+//! ws session end <id> <outcome> [--summary <s>]
+//! ws session list
+//! ws hook <harness> [<payload>]       (payload on standard input, or as the last argument)
 //! ```
 //!
 //! Results are JSON on standard output. A refusal prints `ws: <code>` on
 //! standard error and exits 1; a usage error exits 2. `ws journal verify`
 //! exits like `ws-journal-verify`: 0 valid, 1 invalid, 2 unreadable, 3 torn tail.
+//! `ws hook` writes nothing on standard output and always exits 0: a harness
+//! must never be stopped, nor given context, by its supervision.
 
 use std::ffi::OsString;
 use std::fs;
@@ -100,6 +124,119 @@ fn run(arguments: Vec<OsString>) -> Result<Value, Exit> {
         ["rebuild"] => rebuild(&layout, false),
         ["rebuild", "--check"] => rebuild(&layout, true),
         ["mission", "new", options @ ..] => mission_new(&layout, options),
+        ["hook", harness, rest @ ..] => {
+            hook(&layout, harness, rest);
+            Ok(Value::Null)
+        }
+        ["report", id] => request(&layout, &json!({ "op": "mission.report", "mission": id })),
+        ["report", id, "--markdown"] => {
+            let report = request(&layout, &json!({ "op": "mission.report", "mission": id }))?;
+            print!("{}", work_supervision_cli::report::render(&report));
+            Ok(Value::Null)
+        }
+        ["mission", "scope", id, paths @ ..] if !paths.is_empty() => request(
+            &layout,
+            &json!({ "op": "mission.scope", "mission": id, "paths": paths }),
+        ),
+        ["mission", "check", id, criterion, "--", argv @ ..] if !argv.is_empty() => {
+            let criterion: u64 = criterion.parse().map_err(|_| Exit::Usage)?;
+            request(
+                &layout,
+                &json!({ "op": "mission.check", "mission": id, "criterion": criterion, "argv": argv }),
+            )
+        }
+        ["idea", "add", idea, options @ ..] => {
+            let options = Options::parse(options, &["--session"], &[])?;
+            request(
+                &layout,
+                &with_actor(json!({ "op": "idea.capture", "text": idea }), &options),
+            )
+        }
+        ["idea", "qualify", id, options @ ..] => {
+            let options = Options::parse(
+                options,
+                &["--repository", "--mission", "--context", "--session"],
+                &[],
+            )?;
+            request(
+                &layout,
+                &with_actor(
+                    json!({
+                        "op": "idea.qualify", "idea": id,
+                        "repository": options.optional("--repository"),
+                        "mission": options.optional("--mission"),
+                        "context": options.optional("--context"),
+                    }),
+                    &options,
+                ),
+            )
+        }
+        ["idea", "promote", id, options @ ..] => {
+            let options = Options::parse(
+                options,
+                &["--title", "--repository", "--brief"],
+                &["--criterion"],
+            )?;
+            let brief = options
+                .optional("--brief")
+                .map(|path| fs::read_to_string(path).map_err(|_| refused("brief.unreadable")))
+                .transpose()?;
+            request(
+                &layout,
+                &json!({
+                    "op": "idea.promote", "idea": id, "title": options.one("--title")?,
+                    "repository": options.optional("--repository"), "brief": brief,
+                    "criteria": options.all("--criterion"),
+                }),
+            )
+        }
+        ["request", "open", options @ ..] => request_open(&layout, options),
+        ["request", "withdraw", id, options @ ..] => {
+            let options = Options::parse(options, &["--reason", "--session"], &[])?;
+            request(
+                &layout,
+                &with_actor(
+                    json!({ "op": "request.withdraw", "request": id, "reason": options.one("--reason")? }),
+                    &options,
+                ),
+            )
+        }
+        ["session", "register", options @ ..] => {
+            let options = Options::parse(
+                options,
+                &["--harness", "--label", "--repository", "--mission"],
+                &[],
+            )?;
+            request(
+                &layout,
+                &json!({
+                    "op": "session.register", "harness": options.one("--harness")?,
+                    "label": options.one("--label")?,
+                    "repository": options.optional("--repository"),
+                    "mission": options.optional("--mission"),
+                }),
+            )
+        }
+        ["session", "report", id, state, options @ ..] => {
+            let options = Options::parse(options, &["--note"], &[])?;
+            request(
+                &layout,
+                &json!({
+                    "op": "session.report", "actor": format!("session:{id}"), "session": id,
+                    "state": state, "note": options.optional("--note"),
+                }),
+            )
+        }
+        ["session", "end", id, outcome, options @ ..] => {
+            let options = Options::parse(options, &["--summary"], &[])?;
+            request(
+                &layout,
+                &json!({
+                    "op": "session.end", "actor": format!("session:{id}"), "session": id,
+                    "outcome": outcome, "summary": options.optional("--summary"),
+                }),
+            )
+        }
         ["result", "submit", id, options @ ..] => {
             let options = Options::parse(options, &["--evidence", "--summary"], &[])?;
             let bytes =
@@ -149,8 +286,165 @@ fn simple_request(words: &[&str]) -> Result<Value, Exit> {
         }
         ["worktree", "gc"] => json!({ "op": "worktree.gc" }),
         ["doctor"] => json!({ "op": "doctor" }),
+        ["mission", "depend", id, "--on", on] => {
+            json!({ "op": "mission.depend", "mission": id, "on": on })
+        }
+        ["check", id] => json!({ "op": "check.run", "mission": id }),
+        ["idea", "dismiss", id, "--reason", reason] => {
+            json!({ "op": "idea.dismiss", "idea": id, "reason": reason })
+        }
+        ["idea", "list"] => json!({ "op": "idea.list" }),
+        ["request", "answer", id, choice, "--reason", reason] => {
+            let choice: u64 = choice.parse().map_err(|_| Exit::Usage)?;
+            json!({ "op": "request.answer", "request": id, "choice": choice, "reason": reason })
+        }
+        ["request", "list"] => json!({ "op": "request.list" }),
+        ["request", "list", "--open"] => json!({ "op": "request.list", "open_only": true }),
+        ["session", "list"] => json!({ "op": "session.list" }),
         _ => return Err(Exit::Usage),
     })
+}
+
+/// Adds `actor: session:<id>` when `--session` is given.
+fn with_actor(mut request: Value, options: &Options<'_>) -> Value {
+    if let (Some(session), Value::Object(map)) = (options.optional("--session"), &mut request) {
+        map.insert("actor".to_owned(), json!(format!("session:{session}")));
+    }
+    request
+}
+
+fn request_open(layout: &Layout, words: &[&str]) -> Result<Value, Exit> {
+    let options = Options::parse(
+        words,
+        &["--question", "--mission", "--recommended", "--session"],
+        &["--option"],
+    )?;
+    let choices = options
+        .all("--option")
+        .into_iter()
+        .map(|option| {
+            let mut parts = option.splitn(3, ':');
+            match (parts.next(), parts.next(), parts.next()) {
+                (Some(reversibility), Some(label), Some(consequence)) => Ok(json!({
+                    "reversibility": reversibility, "label": label, "consequence": consequence,
+                })),
+                _ => Err(Exit::Usage),
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let recommended = options
+        .optional("--recommended")
+        .map(|value| value.parse::<u64>().map_err(|_| Exit::Usage))
+        .transpose()?;
+    request(
+        layout,
+        &with_actor(
+            json!({
+                "op": "request.open", "question": options.one("--question")?,
+                "mission": options.optional("--mission"), "options": choices,
+                "recommended": recommended,
+            }),
+            &options,
+        ),
+    )
+}
+
+/// `ws hook`: never fails the harness. Refusals go to standard error only.
+fn hook(layout: &Layout, harness: &str, rest: &[&str]) {
+    if let Err(code) = hook_inner(layout, harness, rest) {
+        eprintln!("ws: hook {code}");
+    }
+}
+
+fn hook_inner(layout: &Layout, harness: &str, rest: &[&str]) -> Result<(), String> {
+    use std::io::Read as _;
+
+    let text = match rest {
+        [payload] => (*payload).to_owned(),
+        [] => {
+            let mut text = String::new();
+            std::io::stdin()
+                .take(1 << 20)
+                .read_to_string(&mut text)
+                .map_err(|_| "hook.payload_unreadable".to_owned())?;
+            text
+        }
+        _ => return Err("hook.usage".to_owned()),
+    };
+    let payload: Value =
+        serde_json::from_str(&text).map_err(|_| "hook.payload_invalid".to_owned())?;
+    let event = work_supervision_cli::hook::translate(harness, &payload)?;
+    if event.action == work_supervision_cli::hook::Action::Ignore {
+        return Ok(());
+    }
+    let digest = {
+        use sha2::Digest as _;
+        let bytes: [u8; 32] = sha2::Sha256::digest(event.external_id.as_bytes()).into();
+        bytes
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    };
+    let call = |body: &Value| {
+        request(layout, body).map_err(|exit| match exit {
+            Exit::Refused(code) => code,
+            _ => "hook.request".to_owned(),
+        })
+    };
+    let found =
+        call(&json!({ "op": "session.find", "harness": harness, "external_digest": digest }))?;
+    let session = match found.get("session").and_then(Value::as_str) {
+        Some(session) => session.to_owned(),
+        None if event.action == work_supervision_cli::hook::Action::End => return Ok(()),
+        None => {
+            let (repository, mission) = context_of(layout, event.cwd.as_deref());
+            let registered = call(&json!({
+                "op": "session.register", "harness": harness,
+                "label": format!("{harness} session"), "repository": repository,
+                "mission": mission, "external_digest": digest,
+            }))?;
+            registered
+                .get("session")
+                .and_then(Value::as_str)
+                .ok_or("hook.request")?
+                .to_owned()
+        }
+    };
+    let actor = format!("session:{session}");
+    match event.action {
+        work_supervision_cli::hook::Action::Report { state, note } => call(&json!({
+            "op": "session.report", "actor": actor, "session": session, "state": state, "note": note,
+        }))?,
+        work_supervision_cli::hook::Action::End => call(&json!({
+            "op": "session.end", "actor": actor, "session": session, "outcome": "completed",
+        }))?,
+        work_supervision_cli::hook::Action::Ignore => Value::Null,
+    };
+    Ok(())
+}
+
+/// Repository (by configured name) and mission (by worktree) a working
+/// directory belongs to, when it can be told.
+fn context_of(layout: &Layout, cwd: Option<&str>) -> (Option<String>, Option<String>) {
+    let Some(cwd) = cwd else {
+        return (None, None);
+    };
+    let mission = Path::new(cwd)
+        .strip_prefix(layout.worktrees())
+        .ok()
+        .and_then(|rest| rest.components().next())
+        .and_then(|first| first.as_os_str().to_str())
+        .filter(|name| {
+            name.len() == 32
+                && name
+                    .bytes()
+                    .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+        })
+        .map(str::to_owned);
+    let repository = Config::load(&layout.config())
+        .ok()
+        .and_then(|config| work_supervision_cli::hook::repository_of(cwd, &config.repositories()));
+    (repository, mission)
 }
 
 fn socket(layout: &Layout) -> PathBuf {
