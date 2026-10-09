@@ -75,6 +75,34 @@ hex_identifier!(
     "run"
 );
 
+hex_identifier!(
+    /// Identifier of a deferred idea: 128 random bits.
+    IdeaId,
+    16,
+    "idea"
+);
+
+hex_identifier!(
+    /// Identifier of a decision request: 128 random bits.
+    RequestId,
+    16,
+    "request"
+);
+
+hex_identifier!(
+    /// Identifier of an agent session declared through the bridge: 128 random bits.
+    SessionId,
+    16,
+    "session"
+);
+
+hex_identifier!(
+    /// Identifier of one execution of a criterion check: 128 random bits.
+    CheckId,
+    16,
+    "check"
+);
+
 /// A git commit: 40 (SHA-1) or 64 (SHA-256) lowercase hexadecimal characters.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CommitId(String);

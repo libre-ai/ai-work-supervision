@@ -52,10 +52,12 @@
 //! # Ok::<(), work_supervision_domain::Refusal>(())
 //! ```
 
+pub mod coordination;
 mod ids;
 mod model;
+pub mod scope;
 
-pub use ids::{CommitId, Digest32, MissionId, RunId};
+pub use ids::{CheckId, CommitId, Digest32, IdeaId, MissionId, RequestId, RunId, SessionId};
 pub use model::{
     Budgets, Command, CommandKind, ExecutorProfile, MAX_DURATION_SECONDS, MAX_OUTPUT_BYTES,
     Mission, MissionEvent, MissionParts, MissionResult, Refusal, State, Verdict, branch_of,
