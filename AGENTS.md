@@ -16,14 +16,13 @@ status" section is generated from it — never edit that section by hand.
   `libre-ai/application-development-toolkit`; data lifecycle bricks live in
   `libre-ai/organization-data-lifecycle`.
 - The Work Supervision v0 native core lives in `crates/` (Cargo workspace at
-  the root, single user, no tenant: ADR-0042 §5). Its journal format is
-  specified in `docs/work-supervision/journal-v0.md`; the writer and the
-  verifier crates must never share code. No executor other than the fake
-  agent may be added before the C0 confinement qualification is green.
-- SQLite (`crates/work-supervision-store`) is a projection rebuilt from the
-  journal, which never holds free texts (`docs/work-supervision/events-v0.md`).
-- Coordination, harness bridge: `docs/work-supervision/coordination-v0.md`.
-- Phases and approved artifacts: `docs/work-supervision/phases-v0.md`.
+  the root, single user, no tenant: ADR-0042 §5); the writer and the verifier
+  crates must never share code. SQLite (`crates/work-supervision-store`) is a
+  projection rebuilt from the journal, which never holds free texts. Until the
+  C0 confinement qualification is green, the fake agent is the only executor.
+- v0 specifications in `docs/work-supervision/`: `journal-v0.md` (journal
+  format), `events-v0.md` (events), `coordination-v0.md` (coordination, harness
+  bridge), `phases-v0.md` (phases and approved artifacts).
 - Recovered code (`apps/missions`, `apps/specifications`, `packages/auth-web`)
   is not product qualification: admission criteria are in the card, not in
   historical documents; `apps/missions` is frozen as the multi-tenant (V6)
@@ -31,9 +30,8 @@ status" section is generated from it — never edit that section by hand.
 
 ## Quality gates
 
-- Prepare the pinned composition first:
-  https://raw.githubusercontent.com/libre-ai/project-governance/HEAD/docs/LOCAL-COMPOSITION.md
-  (target `ai-work-supervision`); installation is an explicit step.
+- Prepare the pinned composition first (target `ai-work-supervision`;
+  installation is an explicit step): https://raw.githubusercontent.com/libre-ai/project-governance/HEAD/docs/LOCAL-COMPOSITION.md
 - Then run `bun run check` from this repository's root in the composition;
   never hide a red test. Browser suites sharing a port run sequentially.
 
