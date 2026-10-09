@@ -70,9 +70,7 @@
           "nullable": false
         }
       ],
-      "primary_key": [
-        "check_id"
-      ]
+      "primary_key": ["check_id"]
     },
     {
       "name": "criterion_checks",
@@ -103,10 +101,7 @@
           "nullable": false
         }
       ],
-      "primary_key": [
-        "mission_id",
-        "criterion"
-      ]
+      "primary_key": ["mission_id", "criterion"]
     },
     {
       "name": "ideas",
@@ -202,9 +197,7 @@
           "nullable": false
         }
       ],
-      "primary_key": [
-        "id"
-      ]
+      "primary_key": ["id"]
     },
     {
       "name": "mission_criteria",
@@ -230,10 +223,7 @@
           "nullable": false
         }
       ],
-      "primary_key": [
-        "mission_id",
-        "position"
-      ]
+      "primary_key": ["mission_id", "position"]
     },
     {
       "name": "mission_dependencies",
@@ -254,10 +244,7 @@
           "nullable": false
         }
       ],
-      "primary_key": [
-        "mission_id",
-        "on_mission"
-      ]
+      "primary_key": ["mission_id", "on_mission"]
     },
     {
       "name": "mission_events",
@@ -283,9 +270,7 @@
           "nullable": false
         }
       ],
-      "primary_key": [
-        "seq"
-      ]
+      "primary_key": ["seq"]
     },
     {
       "name": "mission_notes",
@@ -316,9 +301,7 @@
           "nullable": false
         }
       ],
-      "primary_key": [
-        "seq"
-      ]
+      "primary_key": ["seq"]
     },
     {
       "name": "mission_scopes",
@@ -339,10 +322,7 @@
           "nullable": false
         }
       ],
-      "primary_key": [
-        "mission_id",
-        "position"
-      ]
+      "primary_key": ["mission_id", "position"]
     },
     {
       "name": "missions",
@@ -478,9 +458,7 @@
           "nullable": false
         }
       ],
-      "primary_key": [
-        "id"
-      ]
+      "primary_key": ["id"]
     },
     {
       "name": "projection_position",
@@ -501,9 +479,7 @@
           "nullable": false
         }
       ],
-      "primary_key": [
-        "id"
-      ]
+      "primary_key": ["id"]
     },
     {
       "name": "request_options",
@@ -544,10 +520,7 @@
           "nullable": false
         }
       ],
-      "primary_key": [
-        "request_id",
-        "position"
-      ]
+      "primary_key": ["request_id", "position"]
     },
     {
       "name": "requests",
@@ -628,9 +601,7 @@
           "nullable": false
         }
       ],
-      "primary_key": [
-        "id"
-      ]
+      "primary_key": ["id"]
     },
     {
       "name": "runs",
@@ -711,9 +682,7 @@
           "nullable": false
         }
       ],
-      "primary_key": [
-        "run_id"
-      ]
+      "primary_key": ["run_id"]
     },
     {
       "name": "scope_checks",
@@ -754,10 +723,7 @@
           "nullable": false
         }
       ],
-      "primary_key": [
-        "mission_id",
-        "commit_id"
-      ]
+      "primary_key": ["mission_id", "commit_id"]
     },
     {
       "name": "sessions",
@@ -853,9 +819,7 @@
           "nullable": false
         }
       ],
-      "primary_key": [
-        "id"
-      ]
+      "primary_key": ["id"]
     },
     {
       "name": "worktrees",
@@ -921,9 +885,7 @@
           "nullable": false
         }
       ],
-      "primary_key": [
-        "mission_id"
-      ]
+      "primary_key": ["mission_id"]
     }
   ]
 }
