@@ -76,3 +76,20 @@ attach, `u` result (evidence file, then summary), `a` accept, `x` reject,
 `d` abandon, `c` cancel (each asks for a reason), `q` quit; attached: typed
 text is sent with `⏎`, `Esc` returns to the list. A refusal is shown by its
 code. The interface only sends requests to `wsd`; it never writes the journal.
+
+## Head anchoring
+
+The hash chain cannot see a complete, consistent rewrite of the journal. With
+`[anchor] path = "<file outside the root>"` in the configuration, `wsd`
+records the head (`seq` + digest, one JSON line, schema
+`libre-ai.work-supervision.anchor.v0`, mode 0600, atomic rename) after every
+request and every run event. At start, after the independent verification and
+before opening the writer, it refuses:
+
+- a journal whose entry at the anchored `seq` is missing or has another digest
+  (`journal.anchor_mismatch`) — shorter, longer or same-length rewrites alike;
+- a written journal without its anchor (`journal.anchor_missing`);
+- an anchor path inside the root (`config.anchor_inside_root`).
+
+`ws journal verify` reports the anchor (`matched`, `not-configured`) and exits 1
+on a mismatch or a missing anchor.

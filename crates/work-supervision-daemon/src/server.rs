@@ -25,6 +25,16 @@ pub fn serve(root: &Path) -> Result<(), Failure> {
     let layout = Layout::new(root);
     let config = Config::load(&layout.config())?;
     config.fake_agent()?;
+    if let Some(anchor) = config.anchor() {
+        let root = fs::canonicalize(root).map_err(|_| Failure::new("root.io"))?;
+        let parent = anchor
+            .parent()
+            .and_then(|parent| fs::canonicalize(parent).ok())
+            .ok_or(Failure::new("config.anchor_invalid"))?;
+        if parent.starts_with(&root) {
+            return Err(Failure::new("config.anchor_inside_root"));
+        }
+    }
     let (shared, recovered) = Core::open(layout.clone(), config)?;
     eprintln!("wsd: recovered {}", core::report_json(&recovered));
     let socket = core::socket_path(&layout);
@@ -76,7 +86,9 @@ fn connection(shared: &Shared, stream: UnixStream, own: u32) {
                     .and_then(Value::as_str)
                     .unwrap_or_default()
                     .to_owned();
-                match core::handle(shared, &request) {
+                let outcome = core::handle(shared, &request);
+                core::anchor(shared);
+                match outcome {
                     Ok(data) => success(&op, data),
                     Err(refusal) => failure(refusal.code()),
                 }

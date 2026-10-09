@@ -31,7 +31,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use serde_json::{Value, json};
-use work_supervision_daemon::{Client, init_root};
+use work_supervision_daemon::{Anchor, Client, Config, check_anchor, init_root};
 use work_supervision_journal_verifier::{Outcome, verify};
 use work_supervision_store::{BlobStore, Layout, Store};
 
@@ -254,10 +254,10 @@ fn journal(layout: &Layout, head_only: bool) -> Result<Value, Exit> {
         Ok(Outcome::Valid { entries, head }) => {
             let head = head.map(|head| json!({ "seq": head.seq, "digest": head.digest }));
             if head_only {
-                Ok(head.unwrap_or(Value::Null))
-            } else {
-                Ok(json!({ "valid": true, "entries": entries, "head": head }))
+                return Ok(head.unwrap_or(Value::Null));
             }
+            let anchor = anchor_status(layout)?;
+            Ok(json!({ "valid": true, "entries": entries, "head": head, "anchor": anchor }))
         }
         Ok(Outcome::Invalid { line, code, .. }) => {
             eprintln!("ws: journal invalid: {} at line {line}", code.code());
@@ -272,6 +272,27 @@ fn journal(layout: &Layout, head_only: bool) -> Result<Value, Exit> {
             Err(Exit::Code(2))
         }
     }
+}
+
+/// Checks the anchor named by the configuration, if any (`journal.anchor_*` exits 1).
+fn anchor_status(layout: &Layout) -> Result<Value, Exit> {
+    let Ok(config) = Config::load(&layout.config()) else {
+        return Ok(json!({ "status": "configuration-unreadable" }));
+    };
+    let Some(path) = config.anchor() else {
+        return Ok(json!({ "status": "not-configured" }));
+    };
+    let anchor = Anchor::read(path).map_err(|failure| anchored(failure.code()))?;
+    let Some(anchor) = anchor else {
+        return Err(anchored("journal.anchor_missing"));
+    };
+    check_anchor(&layout.journal(), &anchor).map_err(|failure| anchored(failure.code()))?;
+    Ok(json!({ "status": "matched", "seq": anchor.seq() }))
+}
+
+fn anchored(code: &str) -> Exit {
+    eprintln!("ws: {code}");
+    Exit::Code(1)
 }
 
 fn rebuild(layout: &Layout, check: bool) -> Result<Value, Exit> {

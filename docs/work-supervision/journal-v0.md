@@ -108,6 +108,6 @@ implementations) is
 ## Limits
 
 - The chain detects a modified, removed, inserted or reordered entry. It does not
-  detect a consistent rewrite of the whole file; anchoring the head digest outside
-  the root is a later slice.
+  detect a consistent rewrite of the whole file on its own; the head anchored
+  outside the root does (`daemon-v0.md`, « Head anchoring »).
 - Opening verifies the whole file: the cost is linear in the journal size.

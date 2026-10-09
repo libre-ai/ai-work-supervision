@@ -1,0 +1,27 @@
+[package]
+name = "work-supervision-cockpit"
+description = "ws-cockpit, the read-and-decide web cockpit of Work Supervision v0: server-rendered HTML on 127.0.0.1, no terminal access."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "ws-cockpit"
+path = "src/main.rs"
+
+[dependencies]
+serde_json.workspace = true
+tiny_http.workspace = true
+work-supervision-daemon = { path = "../work-supervision-daemon" }
+work-supervision-domain = { path = "../work-supervision-domain" }
+work-supervision-store = { path = "../work-supervision-store" }
+
+[dev-dependencies]
+tempfile.workspace = true
+work-supervision-journal = { path = "../work-supervision-journal" }
+
+[lints]
+workspace = true
