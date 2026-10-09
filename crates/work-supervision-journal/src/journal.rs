@@ -184,6 +184,23 @@ impl Journal {
         Ok(head)
     }
 
+    /// Visits every committed entry whose `seq` is greater than `after`, in order.
+    ///
+    /// Reads the file through a separate read-only handle while this writer
+    /// keeps its lock; entries are verified again as they are read.
+    ///
+    /// # Errors
+    ///
+    /// As [`crate::replay`].
+    pub fn replay_after<E, F>(&self, after: u64, visit: F) -> Result<Option<Head>, E>
+    where
+        E: From<JournalError>,
+        F: FnMut(crate::Entry) -> Result<(), E>,
+    {
+        let file = File::open(&self.path).map_err(|_| E::from(JournalError::Io))?;
+        crate::entry::replay_file(&file, after, visit)
+    }
+
     fn quarantine(
         &mut self,
         torn: &[u8],

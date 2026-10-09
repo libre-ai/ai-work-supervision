@@ -6,6 +6,7 @@ resolver = "3"
 members = [
   "crates/work-supervision-journal",
   "crates/work-supervision-journal-verifier",
+  "crates/work-supervision-store",
 ]
 
 [workspace.package]
@@ -17,6 +18,7 @@ repository = "https://github.com/libre-ai/ai-work-supervision"
 publish = false
 
 [workspace.dependencies]
+rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled"] }
 serde = { version = "=1.0.229", default-features = false, features = ["std"] }
 serde_jcs = "=0.2.0"
 serde_json = { version = "=1.0.151", default-features = false, features = ["std"] }

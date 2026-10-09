@@ -1,0 +1,219 @@
+{
+  "schema": "libre-ai.work-supervision.projection.v0",
+  "tables": [
+    {
+      "name": "mission_criteria",
+      "columns": [
+        {
+          "name": "mission_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "position",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "text",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "text_digest",
+          "type": "text",
+          "nullable": false
+        }
+      ],
+      "primary_key": ["mission_id", "position"]
+    },
+    {
+      "name": "mission_notes",
+      "columns": [
+        {
+          "name": "seq",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "mission_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "text",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "text_digest",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "at",
+          "type": "text",
+          "nullable": false
+        }
+      ],
+      "primary_key": ["seq"]
+    },
+    {
+      "name": "missions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "title_digest",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "repository",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "brief",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "brief_digest",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "max_duration_seconds",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "max_output_bytes",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "executor",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "revision",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "base_commit",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "branch",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "worktree",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "current_run",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "result_commit",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "evidence_digest",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "summary",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "summary_digest",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "verdict",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "verdict_reason",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "verdict_reason_digest",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "created_seq",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "updated_seq",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "text",
+          "nullable": false
+        }
+      ],
+      "primary_key": ["id"]
+    },
+    {
+      "name": "projection_position",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "seq",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "digest",
+          "type": "text",
+          "nullable": false
+        }
+      ],
+      "primary_key": ["id"]
+    }
+  ]
+}

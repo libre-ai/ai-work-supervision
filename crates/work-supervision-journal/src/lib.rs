@@ -38,6 +38,7 @@
 
 mod codec;
 mod digest;
+mod entry;
 mod error;
 mod event;
 mod journal;
@@ -45,6 +46,7 @@ mod timestamp;
 
 pub use codec::{EncodedLine, Head, encode_line};
 pub use digest::Digest;
+pub use entry::{Entry, replay};
 pub use error::JournalError;
 pub use event::Event;
 pub use journal::{Journal, OpenMode, RECOVERED_KIND, Recovery};

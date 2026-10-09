@@ -1,0 +1,20 @@
+[package]
+name = "work-supervision-store"
+description = "SQLite projection of the Work Supervision v0 journal, its migrations and its reconstruction."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rusqlite.workspace = true
+serde_json.workspace = true
+work-supervision-journal = { path = "../work-supervision-journal" }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
