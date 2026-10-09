@@ -41,6 +41,14 @@
 //! ws session end <id> <outcome> [--summary <s>]
 //! ws session list
 //! ws hook <harness> [<payload>]       (payload on standard input, or as the last argument)
+//!
+//! Phases (docs/work-supervision/phases-v0.md):
+//! ws workflow <id> <phase>…
+//! ws artifact submit <id> <phase> <file> [--session <id>]
+//! ws artifact approve <artifact> --digest <sha256> [--reason <r>]
+//! ws artifact return <artifact> --reason <r>
+//! ws artifact list <id>
+//! ws artifact show <artifact>
 //! ```
 //!
 //! Results are JSON on standard output. A refusal prints `ws: <code>` on
@@ -210,6 +218,31 @@ fn run(arguments: Vec<OsString>) -> Result<Value, Exit> {
                 }),
             )
         }
+        ["workflow", id, phases @ ..] if !phases.is_empty() => request(
+            &layout,
+            &json!({ "op": "mission.workflow", "mission": id, "phases": phases }),
+        ),
+        ["artifact", "submit", id, phase, file, options @ ..] => {
+            let options = Options::parse(options, &["--session"], &[])?;
+            let content = fs::read_to_string(file).map_err(|_| refused("artifact.unreadable"))?;
+            request(
+                &layout,
+                &with_actor(
+                    json!({ "op": "artifact.submit", "mission": id, "phase": phase, "content": content }),
+                    &options,
+                ),
+            )
+        }
+        ["artifact", "approve", artifact, options @ ..] => {
+            let options = Options::parse(options, &["--digest", "--reason"], &[])?;
+            request(
+                &layout,
+                &json!({
+                    "op": "artifact.approve", "artifact": artifact,
+                    "digest": options.one("--digest")?, "reason": options.optional("--reason"),
+                }),
+            )
+        }
         ["request", "open", options @ ..] => request_open(&layout, options),
         ["request", "withdraw", id, options @ ..] => {
             let options = Options::parse(options, &["--reason", "--session"], &[])?;
@@ -321,6 +354,11 @@ fn simple_request(words: &[&str]) -> Result<Value, Exit> {
         ["request", "list"] => json!({ "op": "request.list" }),
         ["request", "list", "--open"] => json!({ "op": "request.list", "open_only": true }),
         ["session", "list"] => json!({ "op": "session.list" }),
+        ["artifact", "return", artifact, "--reason", reason] => {
+            json!({ "op": "artifact.return", "artifact": artifact, "reason": reason })
+        }
+        ["artifact", "list", id] => json!({ "op": "artifact.list", "mission": id }),
+        ["artifact", "show", artifact] => json!({ "op": "artifact.show", "artifact": artifact }),
         _ => return Err(Exit::Usage),
     })
 }

@@ -49,6 +49,60 @@ fn path<'a>(value: &'a Value, keys: &[&str]) -> &'a Value {
         .unwrap_or(&NULL)
 }
 
+/// A fenced code block holding `content` verbatim: the fence is longer than
+/// any backtick run inside, so the content can neither close it nor be read as
+/// Markdown or HTML.
+fn fenced(content: &str) -> String {
+    let longest = content
+        .split(|character| character != '`')
+        .map(str::len)
+        .max()
+        .unwrap_or(0);
+    let fence = "`".repeat(longest.max(2) + 1);
+    let content = content.strip_suffix('\n').unwrap_or(content);
+    format!("{fence}text\n{content}\n{fence}")
+}
+
+/// The declared phases, their current artifacts and the governing one
+/// (`docs/work-supervision/phases-v0.md`).
+fn phases(out: &mut String, report: &Value) {
+    let declared = list(&report["phases"]);
+    if declared.is_empty() {
+        return;
+    }
+    let _ = writeln!(out, "\n## Phases\n");
+    let _ = writeln!(out, "| Phase | Artifact | State | SHA-256 | By |");
+    let _ = writeln!(out, "| --- | --- | --- | --- | --- |");
+    for phase in declared {
+        let artifact = &phase["artifact"];
+        if artifact.is_null() {
+            let _ = writeln!(out, "| {} | — | missing | — | — |", text(&phase["phase"]));
+        } else {
+            let _ = writeln!(
+                out,
+                "| {} | `{}` | {} | `{}` | {} |",
+                text(&phase["phase"]),
+                text(&artifact["id"]),
+                text(&artifact["state"]),
+                text(&artifact["digest"]),
+                cell(&artifact["submitted_by"]),
+            );
+        }
+    }
+    let governing = &report["governing"];
+    if governing.is_null() {
+        let _ = writeln!(out, "\nNo phase is approved yet.");
+    } else {
+        let _ = writeln!(
+            out,
+            "\nGoverning artifact: **{}**, approved at {} (a later phase prevails over an earlier one).\n",
+            text(&governing["phase"]),
+            text(&governing["decided_at"]),
+        );
+        let _ = writeln!(out, "{}", fenced(&text(&governing["content"])));
+    }
+}
+
 /// Renders `report` as Markdown.
 #[must_use]
 pub fn render(report: &Value) -> String {
@@ -169,6 +223,8 @@ pub fn render(report: &Value) -> String {
                 .join(", ")
         }
     );
+
+    phases(&mut out, report);
 
     let _ = writeln!(out, "\n## What was done\n");
     let result = &report["result"];

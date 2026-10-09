@@ -6,11 +6,13 @@
 //! - it listens on `127.0.0.1` only and opens the projection read-only;
 //! - pages show missions, results, evidence digests, run counters and digests,
 //!   verdicts and notes, the contract (scope, dependencies, checks), open
-//!   decision requests with their options side by side, deferred ideas and
-//!   declared agent sessions — never terminal output, and no route reaches a
+//!   decision requests with their options side by side, deferred ideas,
+//!   declared agent sessions and the artifacts of a mission's phases — never
+//!   terminal output, and no route reaches a
 //!   PTY, a run log or an input;
 //! - every write — a decision, a note, an answer to or a withdrawal of a
-//!   decision request, a promotion or a dismissal of an idea — is sent to
+//!   decision request, a promotion or a dismissal of an idea, an approval (by
+//!   the digest of the text shown) or a return of an artifact — is sent to
 //!   `wsd` over its socket, which journals it exactly as `ws` does;
 //! - blockers depend on what only `wsd` holds, so they are asked of it and
 //!   shown unknown when it cannot be reached, never guessed.
@@ -329,6 +331,23 @@ impl Cockpit {
                 }),
                 "/decisions",
             ),
+            ("POST", ["artifacts", id, decision @ ("approve" | "return")]) => {
+                let mission = form.get("mission").cloned().unwrap_or_default();
+                if !is_identifier(&mission) {
+                    return Page::refused(400, "request.field_invalid");
+                }
+                let reason = form.get("reason").filter(|reason| !reason.trim().is_empty());
+                let request = if *decision == "approve" {
+                    json!({
+                        "op": "artifact.approve", "artifact": id,
+                        "digest": form.get("digest").cloned().unwrap_or_default(),
+                        "reason": reason,
+                    })
+                } else {
+                    json!({ "op": "artifact.return", "artifact": id, "reason": reason })
+                };
+                self.forward_to(id, request, &format!("/missions/{mission}"))
+            }
             ("POST", ["ideas", id, "dismiss"]) => self.forward_to(
                 id,
                 json!({
@@ -738,6 +757,7 @@ impl Cockpit {
                 },
             );
         let _ = write!(html, "</dd><dt>Blocked by</dt><dd>{blockers}</dd></dl>");
+        phases_section(&mut html, &store, &mission_id, csrf);
         let requests = store.requests_of(id).unwrap_or_default();
         if !requests.is_empty() {
             html.push_str("<h2>Decision requests</h2><ul>");
@@ -821,6 +841,42 @@ impl Cockpit {
 }
 
 /// Label of a mission run by the fake agent: a simulation, never B′.
+/// The declared phases of a mission and their current artifacts
+/// (`phases-v0.md`). A submitted artifact is shown in full with an approval
+/// form that carries the digest of the very text shown: the owner approves
+/// what they read, and `wsd` refuses the approval if the artifact changed.
+fn phases_section(html: &mut String, store: &Store, mission: &MissionId, csrf: &str) {
+    let Ok(Some(workflow)) = store.workflow(mission) else {
+        return;
+    };
+    let current = store.current_artifacts(mission).unwrap_or_default();
+    html.push_str("<h2>Phases</h2>");
+    for phase in workflow {
+        let _ = write!(html, "<h3>{}</h3>", phase.as_str());
+        let Some(artifact) = current.iter().find(|row| row.phase == phase.as_str()) else {
+            html.push_str("<p>No current artifact.</p>");
+            continue;
+        };
+        let _ = write!(
+            html,
+            "<p>{state} · <code>{digest}</code> · by {author}</p><pre>{content}</pre>",
+            state = escape(&artifact.state),
+            digest = escape(&artifact.digest),
+            author = escape(&artifact.submitted_by),
+            content = escape(&artifact.content),
+        );
+        if artifact.state == "submitted" {
+            let _ = write!(
+                html,
+                "<form method=\"post\" action=\"/artifacts/{id}/approve\"><input type=\"hidden\" name=\"csrf\" value=\"{csrf}\"><input type=\"hidden\" name=\"mission\" value=\"{mission}\"><input type=\"hidden\" name=\"digest\" value=\"{digest}\"><textarea name=\"reason\"></textarea> <button>Approve this text</button></form><form method=\"post\" action=\"/artifacts/{id}/return\"><input type=\"hidden\" name=\"csrf\" value=\"{csrf}\"><input type=\"hidden\" name=\"mission\" value=\"{mission}\"><textarea name=\"reason\" required></textarea> <button>Return</button></form>",
+                id = escape(&artifact.id),
+                mission = mission.as_str(),
+                digest = escape(&artifact.digest),
+            );
+        }
+    }
+}
+
 fn simulation_badge(mission: &work_supervision_domain::Mission) -> &'static str {
     match mission.executor() {
         work_supervision_domain::ExecutorProfile::Fake => {

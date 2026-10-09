@@ -103,6 +103,13 @@ hex_identifier!(
     "check"
 );
 
+hex_identifier!(
+    /// Identifier of a phase artifact: 128 random bits.
+    ArtifactId,
+    16,
+    "artifact"
+);
+
 /// A git commit: 40 (SHA-1) or 64 (SHA-256) lowercase hexadecimal characters.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CommitId(String);

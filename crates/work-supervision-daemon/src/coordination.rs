@@ -16,6 +16,7 @@ use work_supervision_domain::coordination::{
     Actor, Blocker, Harness, IdeaCommand, ReportedState, RequestCommand, RequestOption,
     Reversibility, SessionCommand, SessionOutcome, accept_blockers, holds_worktree, run_blockers,
 };
+use work_supervision_domain::phases::with_phase_blockers;
 use work_supervision_domain::scope::{outside, overlaps};
 use work_supervision_domain::{
     CheckId, Command, CommitId, Digest32, IdeaId, Mission, MissionId, RequestId, SessionId, State,
@@ -33,17 +34,20 @@ const SILENT_AFTER_SECONDS: u64 = 15 * 60;
 
 /// Operations a declared session may ask for; every other operation that
 /// writes is the owner's (`actor.owner_only`).
-const SESSION_OPS: [&str; 6] = [
+const SESSION_OPS: [&str; 7] = [
     "idea.capture",
     "idea.qualify",
     "request.open",
     "request.withdraw",
     "session.report",
     "session.end",
+    "artifact.submit",
 ];
 
 /// Operations that write nothing, or that any client may ask for.
-const OPEN_OPS: [&str; 11] = [
+const OPEN_OPS: [&str; 13] = [
+    "artifact.list",
+    "artifact.show",
     "status",
     "mission.list",
     "mission.show",
@@ -81,12 +85,12 @@ const OPS: [&str; 20] = [
     "decisions.pending",
 ];
 
-fn invalid() -> Failure {
+pub(crate) fn invalid() -> Failure {
     Failure::new("request.field_invalid")
 }
 
 /// The actor a request declares; `owner` when absent.
-fn actor(request: &Value) -> Result<Actor, Failure> {
+pub(crate) fn actor(request: &Value) -> Result<Actor, Failure> {
     match request.get("actor") {
         None | Some(Value::Null) => Ok(Actor::Owner),
         Some(Value::String(text)) => Actor::parse(text).map_err(|_| invalid()),
@@ -109,7 +113,7 @@ pub(crate) fn handles(op: &str) -> bool {
     OPS.contains(&op)
 }
 
-fn optional_text(request: &Value, key: &str) -> Result<Option<String>, Failure> {
+pub(crate) fn optional_text(request: &Value, key: &str) -> Result<Option<String>, Failure> {
     match request.get(key) {
         None | Some(Value::Null) => Ok(None),
         Some(Value::String(text)) => Ok(Some(text.clone())),
@@ -123,7 +127,7 @@ fn optional_mission(request: &Value, key: &str) -> Result<Option<MissionId>, Fai
         .transpose()
 }
 
-fn strings(request: &Value, key: &str) -> Result<Vec<String>, Failure> {
+pub(crate) fn strings(request: &Value, key: &str) -> Result<Vec<String>, Failure> {
     match request.get(key) {
         None | Some(Value::Null) => Ok(Vec::new()),
         Some(Value::Array(items)) => items
@@ -534,10 +538,13 @@ fn run_blockers_of(
     snapshot: &Snapshot,
 ) -> Result<Vec<Blocker>, Failure> {
     let store = core.supervisor.store();
-    Ok(run_blockers(
-        &store.dependencies_of(mission.id())?,
-        &store.open_requests_of(mission.id())?,
-        &snapshot.conflicts(mission),
+    Ok(with_phase_blockers(
+        run_blockers(
+            &store.dependencies_of(mission.id())?,
+            &store.open_requests_of(mission.id())?,
+            &snapshot.conflicts(mission),
+        ),
+        &crate::phases::unapproved(core, mission)?,
     ))
 }
 
@@ -556,15 +563,18 @@ fn accept_blockers_of(core: &Core, mission: &Mission) -> Result<Vec<&'static str
         .iter()
         .map(|check| check.criterion)
         .collect();
-    let blockers = accept_blockers(
-        &store.open_requests_of(mission.id())?,
-        core.checks.contains_key(mission.id().as_str()),
-        &declared,
-        &store.check_outcomes(mission.id())?,
-        submitted.as_ref(),
-        scope_check
-            .as_ref()
-            .and_then(|check| u64::try_from(check.outside.len()).ok()),
+    let blockers = with_phase_blockers(
+        accept_blockers(
+            &store.open_requests_of(mission.id())?,
+            core.checks.contains_key(mission.id().as_str()),
+            &declared,
+            &store.check_outcomes(mission.id())?,
+            submitted.as_ref(),
+            scope_check
+                .as_ref()
+                .and_then(|check| u64::try_from(check.outside.len()).ok()),
+        ),
+        &crate::phases::unapproved(core, mission)?,
     );
     let mut codes: Vec<&'static str> = blockers.iter().map(Blocker::code).collect();
     if store.scope(mission.id())?.is_some() && scope_check.is_none() {
@@ -640,13 +650,21 @@ pub(crate) fn blocker_codes_in(
                 .collect())
         }
         State::ResultSubmitted => accept_blockers_of(core, mission),
-        State::Running | State::WaitingInput | State::Exited => Ok(core
-            .supervisor
-            .store()
-            .open_requests_of(mission.id())?
-            .iter()
-            .map(|_| "request.pending")
-            .collect()),
+        State::Running | State::WaitingInput | State::Exited => {
+            let requests: Vec<Blocker> = core
+                .supervisor
+                .store()
+                .open_requests_of(mission.id())?
+                .into_iter()
+                .map(Blocker::RequestPending)
+                .collect();
+            Ok(
+                with_phase_blockers(requests, &crate::phases::unapproved(core, mission)?)
+                    .iter()
+                    .map(Blocker::code)
+                    .collect(),
+            )
+        }
         State::Accepted | State::Abandoned | State::Cancelled => Ok(Vec::new()),
     }
 }
@@ -864,6 +882,7 @@ pub(crate) fn mission_extras(core: &Core, mission: &Mission) -> Result<Value, Fa
         })).collect::<Vec<_>>(),
         "check_runs": check_runs_json(core, mission)?,
         "requests": store.requests_of(mission.id().as_str())?.iter().map(request_json).collect::<Vec<_>>(),
+        "phases": crate::phases::mission_phases_json(core, mission)?,
         "blockers": blocker_codes(core, mission)?,
         "checks_running": core.checks.contains_key(mission.id().as_str()),
     }))
@@ -964,6 +983,10 @@ pub(crate) fn report(core: &Core, mission: &Mission) -> Result<Value, Failure> {
     if requests.iter().any(|request| request.state == "open") {
         gaps.push("request.pending");
     }
+    if !crate::phases::unapproved(core, mission)?.is_empty() {
+        gaps.push("phase.unapproved");
+    }
+    let (phases, governing) = crate::phases::report_phases(core, mission)?;
     let sessions: Vec<Value> = store
         .sessions()?
         .into_iter()
@@ -1011,6 +1034,8 @@ pub(crate) fn report(core: &Core, mission: &Mission) -> Result<Value, Failure> {
             "scope": scope.map(|paths| paths.iter().map(|path| path.as_str().to_owned()).collect::<Vec<_>>()),
         }),
     );
+    report.insert("phases".to_owned(), phases);
+    report.insert("governing".to_owned(), governing);
     report.insert(
         "result".to_owned(),
         mission.result().map_or(Value::Null, |result| {
