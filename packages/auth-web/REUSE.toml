@@ -2,7 +2,7 @@
 version = 1
 SPDX-PackageName = "auth"
 SPDX-PackageSupplier = "Libre AI <https://github.com/libre-ai>"
-SPDX-PackageDownloadLocation = "https://github.com/libre-ai/auth"
+SPDX-PackageDownloadLocation = "https://github.com/libre-ai/ai-work-supervision"
 
 [[annotations]]
 path = ["**"]

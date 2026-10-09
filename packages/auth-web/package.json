@@ -67,9 +67,6 @@
     "LICENSE"
   ],
   "packageManager": "bun@1.4.0-canary.1",
-  "overrides": {
-    "fast-uri": "4.1.5"
-  },
   "peerDependencies": {
     "@libre-ai/contracts": "=0.1.0",
     "@libre-ai/web-platform": "=0.1.0"
