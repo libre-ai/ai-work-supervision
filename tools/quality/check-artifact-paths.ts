@@ -6,7 +6,13 @@ import { spawnSync } from "node:child_process";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { assertNoMachinePaths, machinePathContext, rustflagOverrides } from "./machine-paths";
+import {
+  assertNoMachinePaths,
+  machinePathContext,
+  machinePathRemaps,
+  remapConfigArgument,
+  rustflagOverrides,
+} from "./machine-paths";
 
 // Shipped binaries only: `ws-fake-agent` is a test fixture, never distributed.
 const RELEASE_BINARIES = [
@@ -31,6 +37,9 @@ const result = spawnSync(
     "--locked",
     "--release",
     ...RELEASE_BINARIES.flatMap(({ package: name, binary }) => ["-p", name, "--bin", binary]),
+    // trim-paths is not stable in Cargo 1.97: the remap is passed explicitly.
+    "--config",
+    remapConfigArgument("build.rustflags", machinePathRemaps(context)),
   ],
   { cwd: repositoryRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
 );
