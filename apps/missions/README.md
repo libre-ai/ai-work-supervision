@@ -1,5 +1,10 @@
 # @libre-ai/missions
 
+> **Frozen reference — no authority over Work Supervision v0.** Kept as the
+> reference of the multi-tenant model (V6) by owner decision Y31
+> (2026-10-09). The v0 state lives in the native core under `crates/`; see
+> [`AGENTS.md`](AGENTS.md).
+
 Layer-2 human cockpit for proposing, risk-assessing, reviewing, observing and
 validating bounded agent missions, keeping reported activity distinct from a
 validated result. Spec: `docs/apps/missions.md`. Work package: `WP-G3-A01`.
