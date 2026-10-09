@@ -364,6 +364,21 @@ impl Store {
         self.query_runs("WHERE mission_id = ?1 ORDER BY started_seq", Some(mission))
     }
 
+    /// Notes of mission `mission`: instant and text, in journal order.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::Sqlite`].
+    pub fn notes_of(&self, mission: &str) -> Result<Vec<(String, String)>, StoreError> {
+        let mut statement = self
+            .connection
+            .prepare("SELECT at, text FROM mission_notes WHERE mission_id = ?1 ORDER BY seq")?;
+        let notes = statement
+            .query_map([mission], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(notes)
+    }
+
     /// Every run still projected as `running`.
     ///
     /// # Errors
