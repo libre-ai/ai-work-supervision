@@ -91,8 +91,13 @@ fn encode_idea(event: &IdeaEvent, blobs: &BlobStore) -> Result<Event, Supervisor
         IdeaEvent::PromotionAborted { idea } => {
             data.insert("idea".to_owned(), string(idea.as_str()));
         }
-        IdeaEvent::Dismissed { idea, reason } => {
+        IdeaEvent::Dismissed {
+            idea,
+            ground,
+            reason,
+        } => {
             data.insert("idea".to_owned(), string(idea.as_str()));
+            data.insert("ground".to_owned(), string(ground.as_str()));
             data.insert("reason_digest".to_owned(), put(blobs, reason)?);
         }
     }
@@ -527,12 +532,15 @@ pub struct IdeaRow {
     pub promoting_mission: Option<String>,
     /// Why it was dismissed.
     pub dismiss_reason: Option<String>,
+    /// On what ground (`implemented`, `refused`, `other`); `None` for a
+    /// dismissal recorded before grounds existed.
+    pub dismiss_ground: Option<String>,
     /// Capture instant.
     pub created_at: String,
 }
 
 const IDEA_COLUMNS: &str = "id, state, text, captured_by, repository, mission_id, context,
-    promoted_mission, promoting_mission, dismiss_reason, created_at";
+    promoted_mission, promoting_mission, dismiss_reason, created_at, dismiss_ground";
 
 impl IdeaRow {
     fn read(row: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
@@ -548,6 +556,7 @@ impl IdeaRow {
             promoting_mission: row.get(8)?,
             dismiss_reason: row.get(9)?,
             created_at: row.get(10)?,
+            dismiss_ground: row.get(11)?,
         })
     }
 }
@@ -681,6 +690,17 @@ impl CheckRunRow {
             && self.exit_code == Some(0)
             && self.signal.is_none()
             && self.budget.is_none()
+    }
+
+    /// Whether the execution failed on its own: finished within its budgets
+    /// with an exit other than 0 or a signal. A program that could not be
+    /// started (no exit code, no signal) or a check stopped by its budget
+    /// says nothing about the criterion, so neither is red.
+    #[must_use]
+    pub fn red(&self) -> bool {
+        self.state == "finished"
+            && self.budget.is_none()
+            && (self.exit_code.is_some_and(|code| code != 0) || self.signal.is_some())
     }
 }
 
@@ -1116,6 +1136,25 @@ impl Store {
                     passed: row.passed(),
                 })
             })
+            .collect()
+    }
+
+    /// The criteria whose last finished check execution at `commit` was red
+    /// ([`CheckRunRow::red`]), in criterion order.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::Sqlite`].
+    pub fn red_at(&self, mission: &MissionId, commit: &CommitId) -> Result<Vec<usize>, StoreError> {
+        let mut last: std::collections::BTreeMap<i64, bool> = std::collections::BTreeMap::new();
+        for row in self.check_runs(mission)? {
+            if row.state == "finished" && row.commit == commit.as_str() {
+                last.insert(row.criterion, row.red());
+            }
+        }
+        last.into_iter()
+            .filter(|(_, red)| *red)
+            .map(|(criterion, _)| usize::try_from(criterion).map_err(|_| StoreError::Sqlite))
             .collect()
     }
 

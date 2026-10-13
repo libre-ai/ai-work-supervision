@@ -62,6 +62,7 @@ fn host_git(dir: &Path, args: &[&str]) -> String {
 struct Fixture {
     _dir: tempfile::TempDir,
     root: PathBuf,
+    repo: PathBuf,
 }
 
 fn fixture() -> Fixture {
@@ -94,7 +95,40 @@ fn fixture() -> Fixture {
         fake_agent().display()
     );
     fs::write(root.join("config.toml"), config).unwrap();
-    Fixture { _dir: dir, root }
+    Fixture {
+        _dir: dir,
+        root,
+        repo,
+    }
+}
+
+/// Merges the kept branch of an accepted mission into the repository's
+/// checked-out branch, as the owner integrates a result.
+fn merge_result(repo: &Path, mission: &str) {
+    host_git(
+        repo,
+        &[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@example.invalid",
+            "merge",
+            "-q",
+            "--no-ff",
+            "-m",
+            "integrate",
+            &format!("ws/{mission}"),
+        ],
+    );
+}
+
+/// Readies `mission` if needed and runs its checks at the base.
+fn base_checks(client: &mut Client, mission: &str) {
+    if show(client, mission)["state"] == "draft" {
+        call(client, json!({ "op": "mission.ready", "mission": mission })).unwrap();
+    }
+    call(client, json!({ "op": "check.run", "mission": mission })).unwrap();
+    wait_checks(client, mission);
 }
 
 struct Daemon {
@@ -283,8 +317,28 @@ fn a_dependency_holds_the_run_until_it_is_accepted() {
     );
     run_and_submit(&mut client, &fixture.root, &first);
     accept(&mut client, &first).unwrap();
+    // Accepted is not merged: the result sits on `ws/<first>`, outside the
+    // history the second mission would start from.
+    assert_eq!(
+        show(&mut client, &second)["blockers"],
+        json!(["dependency.unmerged"])
+    );
+    assert_eq!(
+        code(call(&mut client, json!({ "op": "run", "mission": second }))),
+        "dependency.unmerged"
+    );
+    merge_result(&fixture.repo, &first);
     assert_eq!(show(&mut client, &second)["blockers"], json!([]));
     call(&mut client, json!({ "op": "run", "mission": second })).unwrap();
+    // The second mission starts from a base holding the first one's result.
+    assert!(
+        fixture
+            .root
+            .join("worktrees")
+            .join(&second)
+            .join("a.txt")
+            .is_file()
+    );
     // Declarations are frozen with the brief.
     assert_eq!(
         code(call(
@@ -572,6 +626,9 @@ fn checks_verify_criteria_at_the_submitted_commit() {
         )),
         "check.criterion_unknown"
     );
+    // At the base both criteria are red: the file does not exist yet.
+    base_checks(&mut client, &mission);
+    assert_eq!(show(&mut client, &mission)["state"], "provisioned");
     run_and_submit(&mut client, &fixture.root, &mission);
     assert_eq!(code(accept(&mut client, &mission)), "criteria.unverified");
     let started = call(
@@ -583,13 +640,18 @@ fn checks_verify_criteria_at_the_submitted_commit() {
     wait_checks(&mut client, &mission);
     let shown = show(&mut client, &mission);
     let runs = shown["check_runs"].as_array().unwrap();
-    assert_eq!(runs.len(), 2);
+    assert_eq!(runs.len(), 4);
+    assert_eq!(runs[0]["commit"], shown["base_commit"]);
     assert_eq!(
         (runs[0]["passed"].clone(), runs[0]["exit_code"].clone()),
+        (json!(false), json!(1))
+    );
+    assert_eq!(
+        (runs[2]["passed"].clone(), runs[2]["exit_code"].clone()),
         (json!(true), json!(0))
     );
     assert_eq!(
-        (runs[1]["passed"].clone(), runs[1]["exit_code"].clone()),
+        (runs[3]["passed"].clone(), runs[3]["exit_code"].clone()),
         (json!(false), json!(3))
     );
     // One criterion still fails: no acceptance.
@@ -609,6 +671,7 @@ fn checks_verify_criteria_at_the_submitted_commit() {
                 "argv": ["/bin/sh", "-c", "test -f ok.txt"] }),
     )
     .unwrap();
+    base_checks(&mut client, &passing);
     run_and_submit(&mut client, &fixture.root, &passing);
     call(
         &mut client,
@@ -654,6 +717,129 @@ fn checks_verify_criteria_at_the_submitted_commit() {
     let position = |kind: &str| kinds.iter().position(|seen| *seen == kind).unwrap();
     assert!(position("check.finished") < position("mission.accepted"));
     assert_journal_and_projection(&fixture.root);
+}
+
+#[test]
+fn a_criterion_must_be_seen_red_at_the_base_before_acceptance() {
+    let fixture = fixture();
+    let daemon = Daemon::start(&fixture.root, None);
+    let mut client = daemon.client();
+    let declare = |client: &mut Client, mission: &str, script: &str| {
+        call(
+            client,
+            json!({ "op": "mission.check", "mission": mission, "criterion": 0,
+                    "argv": ["/bin/sh", "-c", script] }),
+        )
+        .unwrap();
+    };
+
+    // A criterion already true before the work: green at the base.
+    let vacuous = new_mission(&mut client, &writes("v.txt"), &["README exists"]);
+    declare(&mut client, &vacuous, "test -f README");
+    assert_eq!(
+        code(call(
+            &mut client,
+            json!({ "op": "check.run", "mission": vacuous })
+        )),
+        "check.not_submitted",
+        "a draft mission has no base to check yet"
+    );
+    base_checks(&mut client, &vacuous);
+    run_and_submit(&mut client, &fixture.root, &vacuous);
+    call(
+        &mut client,
+        json!({ "op": "check.run", "mission": vacuous }),
+    )
+    .unwrap();
+    wait_checks(&mut client, &vacuous);
+    assert_eq!(
+        code(accept(&mut client, &vacuous)),
+        "criteria.not_red_at_base"
+    );
+    let report = call(
+        &mut client,
+        json!({ "op": "mission.report", "mission": vacuous }),
+    )
+    .unwrap();
+    assert_eq!(report["intent"]["criteria"][0]["verified"], true);
+    assert_eq!(report["intent"]["criteria"][0]["red_at_base"], false);
+    assert!(
+        report["gaps"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("criteria.not_red_at_base"))
+    );
+    call(
+        &mut client,
+        json!({ "op": "decide", "mission": vacuous, "decision": "abandon", "reason": "vacuous" }),
+    )
+    .unwrap();
+
+    // A run without the base checks leaves the criterion unproven at the base.
+    let skipped = new_mission(&mut client, &writes("s.txt"), &["s.txt exists"]);
+    declare(&mut client, &skipped, "test -f s.txt");
+    run_and_submit(&mut client, &fixture.root, &skipped);
+    call(
+        &mut client,
+        json!({ "op": "check.run", "mission": skipped }),
+    )
+    .unwrap();
+    wait_checks(&mut client, &skipped);
+    assert_eq!(
+        code(accept(&mut client, &skipped)),
+        "criteria.not_red_at_base"
+    );
+    drop(daemon);
+    assert_journal_and_projection(&fixture.root);
+}
+
+#[test]
+fn base_checks_provision_only_what_a_run_may_provision() {
+    let fixture = fixture();
+    let daemon = Daemon::start(&fixture.root, None);
+    let mut client = daemon.client();
+    let first = new_mission(&mut client, &writes("a.txt"), &[]);
+    let second = new_mission(&mut client, &writes("b.txt"), &["b.txt exists"]);
+    call(
+        &mut client,
+        json!({ "op": "mission.check", "mission": second, "criterion": 0,
+                "argv": ["/bin/sh", "-c", "test -f b.txt"] }),
+    )
+    .unwrap();
+    call(
+        &mut client,
+        json!({ "op": "mission.depend", "mission": second, "on": first }),
+    )
+    .unwrap();
+    call(
+        &mut client,
+        json!({ "op": "mission.ready", "mission": second }),
+    )
+    .unwrap();
+    // A base taken before the dependency is in would be the wrong base.
+    assert_eq!(
+        code(call(
+            &mut client,
+            json!({ "op": "check.run", "mission": second })
+        )),
+        "dependency.pending"
+    );
+    assert_eq!(show(&mut client, &second)["state"], "ready");
+    run_and_submit(&mut client, &fixture.root, &first);
+    accept(&mut client, &first).unwrap();
+    assert_eq!(
+        code(call(
+            &mut client,
+            json!({ "op": "check.run", "mission": second })
+        )),
+        "dependency.unmerged"
+    );
+    merge_result(&fixture.repo, &first);
+    base_checks(&mut client, &second);
+    let shown = show(&mut client, &second);
+    assert_eq!(shown["state"], "provisioned");
+    assert_eq!(shown["check_runs"][0]["commit"], shown["base_commit"]);
+    assert_eq!(shown["check_runs"][0]["passed"], false);
 }
 
 #[test]
@@ -749,7 +935,7 @@ fn an_idea_is_promoted_once_even_across_a_crash() {
 fn a_check_left_running_by_a_crash_is_interrupted_and_never_passes() {
     let fixture = fixture();
     let mission = {
-        let daemon = Daemon::start(&fixture.root, Some("check-started"));
+        let daemon = Daemon::start(&fixture.root, None);
         let mut client = daemon.client();
         let mission = new_mission(&mut client, &writes("r.txt"), &["r.txt exists"]);
         call(
@@ -758,6 +944,12 @@ fn a_check_left_running_by_a_crash_is_interrupted_and_never_passes() {
                     "argv": ["/bin/sh", "-c", "test -f r.txt"] }),
         )
         .unwrap();
+        base_checks(&mut client, &mission);
+        mission
+    };
+    let mission = {
+        let daemon = Daemon::start(&fixture.root, Some("check-started"));
+        let mut client = daemon.client();
         run_and_submit(&mut client, &fixture.root, &mission);
         call(
             &mut client,
@@ -770,7 +962,9 @@ fn a_check_left_running_by_a_crash_is_interrupted_and_never_passes() {
     let daemon = Daemon::start(&fixture.root, None);
     let mut client = daemon.client();
     let shown = show(&mut client, &mission);
-    assert_eq!(shown["check_runs"][0]["state"], "interrupted");
+    // [0] is the base execution, [1] the one the crash left started.
+    assert_eq!(shown["check_runs"][0]["state"], "finished");
+    assert_eq!(shown["check_runs"][1]["state"], "interrupted");
     assert_eq!(code(accept(&mut client, &mission)), "criteria.unverified");
     call(
         &mut client,
@@ -1193,4 +1387,154 @@ fn a_mission_without_workflow_is_unchanged_and_refuses_artifacts() {
     assert_eq!(report["governing"], Value::Null);
     run_and_submit(&mut client, &fixture.root, &mission);
     accept(&mut client, &mission).unwrap();
+}
+
+// ----------------------------------------------------------- outline split ---
+// docs/work-supervision/coordination-v0.md, « Outline split »
+
+const SPLIT_PLAN: &str = r#"{"missions": [
+  {"key": "lexer", "title": "Lexer", "brief": "print lexer", "demonstrates": "a file is tokenised"},
+  {"key": "parser", "title": "Parser", "brief": "print parser", "demonstrates": "a file is parsed",
+   "after": ["lexer"]},
+  {"key": "cli", "title": "CLI", "brief": "print cli", "demonstrates": "ws parses a file",
+   "after": ["parser", "lexer"]}
+]}"#;
+
+/// A mission whose outline is approved; returns (mission, outline artifact).
+fn outlined(client: &mut Client) -> (String, String) {
+    let mission = new_mission(client, &writes("design.txt"), &[]);
+    call(
+        client,
+        json!({ "op": "mission.workflow", "mission": mission, "phases": ["outline"] }),
+    )
+    .unwrap();
+    call(client, json!({ "op": "mission.ready", "mission": mission })).unwrap();
+    let artifact =
+        submit_artifact(client, &mission, "outline", "lexer, parser, cli", None).unwrap();
+    approve(client, &artifact);
+    (mission, artifact)
+}
+
+fn split_request(mission: &str, artifact: &str, plan: &str) -> Value {
+    json!({ "op": "outline.split", "mission": mission, "artifact": artifact, "plan": plan })
+}
+
+fn mission_count(client: &mut Client) -> usize {
+    call(client, json!({ "op": "mission.list" }))
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .len()
+}
+
+/// The planned missions of the split of `parent`, and the dependency edges
+/// among them as `(mission, waits for)` positions.
+fn split_shape(client: &mut Client, parent: &str) -> (String, Vec<String>, Vec<(usize, usize)>) {
+    let split = show(client, parent)["outline"]["splits"][0].clone();
+    let missions: Vec<String> = split["missions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|id| id.as_str().unwrap().to_owned())
+        .collect();
+    let mut edges = Vec::new();
+    for (position, id) in missions.iter().enumerate() {
+        for dependency in show(client, id)["dependencies"].as_array().unwrap() {
+            let on = missions
+                .iter()
+                .position(|other| dependency["mission"] == other.as_str())
+                .unwrap();
+            edges.push((position, on));
+        }
+    }
+    edges.sort_unstable();
+    (split["state"].as_str().unwrap().to_owned(), missions, edges)
+}
+
+#[test]
+fn an_approved_outline_becomes_draft_missions_linked_by_their_dependencies() {
+    let fixture = fixture();
+    let daemon = Daemon::start(&fixture.root, None);
+    let mut client = daemon.client();
+    let (mission, artifact) = outlined(&mut client);
+    let before = mission_count(&mut client);
+    // Refused before anything is written: a cycle, a session, another phase.
+    let cycle = r#"{"missions": [
+      {"key": "a", "title": "A", "brief": "b", "demonstrates": "d", "after": ["b"]},
+      {"key": "b", "title": "B", "brief": "b", "demonstrates": "d", "after": ["a"]}]}"#;
+    assert_eq!(
+        code(call(&mut client, split_request(&mission, &artifact, cycle))),
+        "dependency.cycle"
+    );
+    let mut as_session = split_request(&mission, &artifact, SPLIT_PLAN);
+    as_session["actor"] = json!(format!("session:{}", "a".repeat(32)));
+    assert_eq!(code(call(&mut client, as_session)), "actor.owner_only");
+    let untitled =
+        r#"{"missions": [{"key": "a", "title": "", "brief": "b", "demonstrates": "d"}]}"#;
+    assert_eq!(
+        code(call(
+            &mut client,
+            split_request(&mission, &artifact, untitled)
+        )),
+        "mission.field_invalid"
+    );
+    assert_eq!(mission_count(&mut client), before);
+    assert_eq!(show(&mut client, &mission)["outline"]["splits"], json!([]));
+
+    let split = call(&mut client, split_request(&mission, &artifact, SPLIT_PLAN)).unwrap();
+    assert_eq!(split["missions"][2]["key"], "cli");
+    assert_eq!(mission_count(&mut client), before + 3);
+    let (state, missions, edges) = split_shape(&mut client, &mission);
+    assert_eq!(state, "split");
+    assert_eq!(edges, [(1, 0), (2, 0), (2, 1)]);
+    let cli = show(&mut client, &missions[2]);
+    assert_eq!(cli["state"], "draft");
+    assert_eq!(cli["repository"], "sample");
+    assert_eq!(cli["criteria"], json!(["ws parses a file"]));
+    assert_eq!(cli["outline"]["planned_by"]["mission"], mission.as_str());
+    assert_eq!(cli["outline"]["planned_by"]["position"], 2);
+    // The owner still refines a planned draft before freezing it.
+    call(
+        &mut client,
+        json!({ "op": "mission.scope", "mission": missions[2], "paths": ["src/cli"] }),
+    )
+    .unwrap();
+    assert_eq!(
+        code(call(
+            &mut client,
+            split_request(&mission, &artifact, SPLIT_PLAN)
+        )),
+        "outline.already_split"
+    );
+    drop(daemon);
+    assert_journal_and_projection(&fixture.root);
+}
+
+#[test]
+fn a_split_interrupted_by_a_crash_is_finished_at_restart() {
+    for point in ["outline-split-intended", "outline-missions-created"] {
+        let fixture = fixture();
+        let (mission, before) = {
+            let daemon = Daemon::start(&fixture.root, None);
+            let mut client = daemon.client();
+            let (mission, artifact) = outlined(&mut client);
+            let before = mission_count(&mut client);
+            drop(daemon);
+            let daemon = Daemon::start(&fixture.root, Some(point));
+            let mut client = daemon.client();
+            let _ = call(&mut client, split_request(&mission, &artifact, SPLIT_PLAN));
+            daemon.died();
+            (mission, before)
+        };
+        let daemon = Daemon::start(&fixture.root, None);
+        let mut client = daemon.client();
+        let doctor = call(&mut client, json!({ "op": "doctor" })).unwrap();
+        let (state, missions, edges) = split_shape(&mut client, &mission);
+        assert_eq!(state, "split", "{point}: {doctor}");
+        assert_eq!(missions.len(), 3, "{point}");
+        assert_eq!(mission_count(&mut client), before + 3, "{point}");
+        assert_eq!(edges, [(1, 0), (2, 0), (2, 1)], "{point}");
+        drop(daemon);
+        assert_journal_and_projection(&fixture.root);
+    }
 }

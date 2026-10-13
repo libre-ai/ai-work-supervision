@@ -352,6 +352,7 @@ impl Cockpit {
                 id,
                 json!({
                     "op": "idea.dismiss", "idea": id,
+                    "ground": form.get("ground").cloned().unwrap_or_default(),
                     "reason": form.get("reason").cloned().unwrap_or_default(),
                 }),
                 "/ideas",
@@ -493,7 +494,7 @@ impl Cockpit {
         for idea in &ideas {
             let act = match idea.state.as_str() {
                 "captured" | "qualified" => format!(
-                    "<form method=\"post\" action=\"/ideas/{id}/promote\"><input type=\"hidden\" name=\"csrf\" value=\"{csrf}\"><input name=\"title\" placeholder=\"Mission title\" required> <input name=\"repository\" placeholder=\"repository\" value=\"{repository}\"> <button>Promote</button></form><form method=\"post\" action=\"/ideas/{id}/dismiss\"><input type=\"hidden\" name=\"csrf\" value=\"{csrf}\"><input name=\"reason\" placeholder=\"reason\" required> <button>Dismiss</button></form>",
+                    "<form method=\"post\" action=\"/ideas/{id}/promote\"><input type=\"hidden\" name=\"csrf\" value=\"{csrf}\"><input name=\"title\" placeholder=\"Mission title\" required> <input name=\"repository\" placeholder=\"repository\" value=\"{repository}\"> <button>Promote</button></form><form method=\"post\" action=\"/ideas/{id}/dismiss\"><input type=\"hidden\" name=\"csrf\" value=\"{csrf}\"><select name=\"ground\" required><option value=\"\">ground…</option><option value=\"implemented\">already implemented</option><option value=\"refused\">refused</option><option value=\"other\">other</option></select> <input name=\"reason\" placeholder=\"reason\" required> <button>Dismiss</button></form>",
                     id = idea.id,
                     repository = escape(idea.repository.as_deref().unwrap_or_default()),
                 ),
@@ -503,7 +504,17 @@ impl Cockpit {
                     .map_or_else(String::new, |id| {
                         format!("<a href=\"/missions/{id}\">mission</a>")
                     }),
-                _ => escape(idea.dismiss_reason.as_deref().unwrap_or_default()),
+                // The ground first: "already implemented" is not "refused".
+                _ => format!(
+                    "{}{}",
+                    idea.dismiss_ground
+                        .as_deref()
+                        .map_or_else(String::new, |ground| format!(
+                            "<b>{}</b> — ",
+                            escape(ground)
+                        )),
+                    escape(idea.dismiss_reason.as_deref().unwrap_or_default())
+                ),
             };
             let _ = write!(
                 html,

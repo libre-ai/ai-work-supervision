@@ -21,6 +21,7 @@ fn sample() -> serde_json::Value {
             "brief": "print hello\n",
             "criteria": [
                 { "index": 0, "text": "tests pass", "check": { "argv": ["cargo", "test"] },
+                  "red_at_base": true,
                   "last_execution": { "commit": "a", "state": "finished", "exit_code": 0,
                                       "passed": true, "at_submitted_commit": true } },
                 { "index": 1, "text": "docs updated", "check": null, "last_execution": null }
@@ -61,8 +62,8 @@ fn a_report_renders_every_section_a_reader_needs() {
         "No decision yet.",
         "Blocked by: `scope.violated`",
         "Gaps: `simulation`, `criteria.unchecked`, `scope.violated`",
-        "| 0 | tests pass | `cargo test` | passed (exit 0), at the submitted commit |",
-        "| 1 | docs updated | none | — |",
+        "| 0 | tests pass | `cargo test` | yes | passed (exit 0), at the submitted commit |",
+        "| 1 | docs updated | none | — | — |",
         "- `fedcba9876543210fedcba9876543210` (accepted)",
         "Scope: `src/cache`",
         "memoised",

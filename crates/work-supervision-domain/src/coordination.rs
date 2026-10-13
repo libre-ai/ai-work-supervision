@@ -90,6 +90,16 @@ pub enum CoordinationRefusal {
     ArtifactNotPending,
     /// The approved digest is not the artifact's.
     ArtifactDigestMismatch,
+    /// The artifact is not the approved `outline` of the mission.
+    OutlineUnapproved,
+    /// This outline is split already, or its split is under way.
+    OutlineAlreadySplit,
+    /// A slice key is not `[a-z0-9][a-z0-9-]*`, 1 to 32 bytes.
+    OutlineKeyInvalid,
+    /// Two slices share a key.
+    OutlineKeyDuplicate,
+    /// A slice waits for a key the plan does not hold.
+    OutlineDependencyUnknown,
 }
 
 impl CoordinationRefusal {
@@ -124,6 +134,11 @@ impl CoordinationRefusal {
             Self::ArtifactNotFound => "artifact.not_found",
             Self::ArtifactNotPending => "artifact.not_pending",
             Self::ArtifactDigestMismatch => "artifact.digest_mismatch",
+            Self::OutlineUnapproved => "outline.unapproved",
+            Self::OutlineAlreadySplit => "outline.already_split",
+            Self::OutlineKeyInvalid => "outline.key_invalid",
+            Self::OutlineKeyDuplicate => "outline.key_duplicate",
+            Self::OutlineDependencyUnknown => "outline.dependency_unknown",
         }
     }
 }
@@ -298,6 +313,20 @@ named_enum!(
 );
 
 named_enum!(
+    /// Why an idea is given up. "Already implemented" and "refused" are kept
+    /// apart: an idea the code already holds was never refused, and reading
+    /// one as the other later turns a done thing into a forbidden one.
+    DismissGround, "ground", {
+        /// What it asks for already exists.
+        Implemented => "implemented",
+        /// The owner decided against it.
+        Refused => "refused",
+        /// Neither (a duplicate idea, an idea overtaken by events).
+        Other => "other",
+    }
+);
+
+named_enum!(
     /// Reversibility of an option of a decision request.
     Reversibility, "reversibility", {
         /// Undone at no significant cost.
@@ -398,6 +427,8 @@ pub enum IdeaCommand {
     AbortPromotion,
     /// Give it up.
     Dismiss {
+        /// On what ground.
+        ground: DismissGround,
         /// Why.
         reason: String,
     },
@@ -451,6 +482,8 @@ pub enum IdeaEvent {
     Dismissed {
         /// Idea.
         idea: IdeaId,
+        /// On what ground.
+        ground: DismissGround,
         /// Why.
         reason: String,
     },
@@ -561,13 +594,14 @@ pub fn decide_idea(
                 Err(forbidden)
             }
         }
-        IdeaCommand::Dismiss { reason } => {
+        IdeaCommand::Dismiss { ground, reason } => {
             actor.require_owner()?;
             if !open {
                 return Err(forbidden);
             }
             Ok(IdeaEvent::Dismissed {
                 idea,
+                ground: *ground,
                 reason: line(reason, MAX_COORDINATION_LINE_CHARS, "reason")?,
             })
         }
@@ -1069,6 +1103,9 @@ pub enum Blocker {
     DependencyUnsatisfiable(MissionId),
     /// A dependency is not accepted yet.
     DependencyPending(MissionId),
+    /// A dependency of the same repository is accepted, but its result is
+    /// not in the history the run starts from: accepted is not merged.
+    DependencyUnmerged(MissionId),
     /// A decision request on the mission is open.
     RequestPending(RequestId),
     /// Another active mission of the repository has an overlapping scope.
@@ -1077,6 +1114,9 @@ pub enum Blocker {
     CheckRunning,
     /// The criterion's check did not pass at the submitted commit.
     CriteriaUnverified(usize),
+    /// The criterion's check was not seen failing at the mission's base
+    /// commit: a criterion already true before the work proves nothing.
+    CriteriaNotRedAtBase(usize),
     /// Changed files lie outside the declared scope.
     ScopeViolated(u64),
     /// A declared phase has no approved artifact (`phases-v0.md`).
@@ -1090,10 +1130,12 @@ impl Blocker {
         match self {
             Self::DependencyUnsatisfiable(_) => "dependency.unsatisfiable",
             Self::DependencyPending(_) => "dependency.pending",
+            Self::DependencyUnmerged(_) => "dependency.unmerged",
             Self::RequestPending(_) => "request.pending",
             Self::ScopeConflict(_) => "scope.conflict",
             Self::CheckRunning => "check.running",
             Self::CriteriaUnverified(_) => "criteria.unverified",
+            Self::CriteriaNotRedAtBase(_) => "criteria.not_red_at_base",
             Self::ScopeViolated(_) => "scope.violated",
             Self::PhaseUnapproved(_) => "phase.unapproved",
         }
@@ -1114,11 +1156,16 @@ pub const fn holds_worktree(state: State) -> bool {
     )
 }
 
-/// What guards a run, in the order of the specification: unsatisfiable and
-/// pending dependencies, open requests, scope conflicts.
+/// What guards a run, in the order of the specification: unsatisfiable,
+/// pending and unmerged dependencies, open requests, scope conflicts.
+///
+/// `unmerged` lists the accepted dependencies whose result the caller found
+/// outside the history the run starts from; a listed mission that is not an
+/// accepted dependency is ignored, so a caller cannot block on a stranger.
 #[must_use]
 pub fn run_blockers(
     dependencies: &[(MissionId, State)],
+    unmerged: &[MissionId],
     open_requests: &[RequestId],
     conflicts: &[MissionId],
 ) -> Vec<Blocker> {
@@ -1134,6 +1181,12 @@ pub fn run_blockers(
                 !matches!(state, State::Accepted | State::Abandoned | State::Cancelled)
             })
             .map(|(id, _)| Blocker::DependencyPending(id.clone())),
+    );
+    blockers.extend(
+        dependencies
+            .iter()
+            .filter(|(id, state)| *state == State::Accepted && unmerged.contains(id))
+            .map(|(id, _)| Blocker::DependencyUnmerged(id.clone())),
     );
     blockers.extend(open_requests.iter().cloned().map(Blocker::RequestPending));
     blockers.extend(conflicts.iter().cloned().map(Blocker::ScopeConflict));
@@ -1152,17 +1205,21 @@ pub struct CheckOutcome {
 }
 
 /// What guards an acceptance, in the order of the specification: open
-/// requests, running checks, unverified criteria, scope violation.
+/// requests, running checks, unverified criteria, criteria not seen red at
+/// the base, scope violation.
 ///
 /// `declared` lists the criteria carrying a check; `last` the last finished
-/// execution of each; `outside` the outside count of the scope check at the
-/// submitted commit, when there is one.
+/// execution of each; `red_at_base` the criteria whose last finished
+/// execution at the mission's base commit failed (an exit other than 0 or a
+/// signal, within its budgets); `outside` the outside count of the scope
+/// check at the submitted commit, when there is one.
 #[must_use]
 pub fn accept_blockers(
     open_requests: &[RequestId],
     checks_running: bool,
     declared: &[usize],
     last: &[CheckOutcome],
+    red_at_base: &[usize],
     submitted: Option<&CommitId>,
     outside: Option<u64>,
 ) -> Vec<Blocker> {
@@ -1182,6 +1239,13 @@ pub fn accept_blockers(
             blockers.push(Blocker::CriteriaUnverified(*criterion));
         }
     }
+    blockers.extend(
+        declared
+            .iter()
+            .filter(|criterion| !red_at_base.contains(criterion))
+            .copied()
+            .map(Blocker::CriteriaNotRedAtBase),
+    );
     if let Some(count) = outside.filter(|count| *count > 0) {
         blockers.push(Blocker::ScopeViolated(count));
     }

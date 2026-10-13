@@ -147,10 +147,22 @@ pub(crate) fn idea(
         )?,
         "idea.dismissed" if open => {
             let (reason, digest) = fields.text("reason_digest", blobs)?;
+            // Absent from dismissals journalled before migration 0006: their
+            // ground was never recorded, and is not guessed.
+            let ground = match fields.data.get("ground") {
+                None => None,
+                Some(Value::String(ground)) => Some(
+                    work_supervision_domain::coordination::DismissGround::parse(ground)
+                        .map_err(|_| fields.invalid())?
+                        .as_str(),
+                ),
+                Some(_) => return Err(fields.invalid()),
+            };
             transaction.execute(
                 "UPDATE ideas SET state = 'dismissed', dismiss_reason = ?2,
-                   dismiss_reason_digest = ?3, updated_seq = ?4, updated_at = ?5 WHERE id = ?1",
-                params![idea, reason, digest, seq, at],
+                   dismiss_reason_digest = ?3, dismiss_ground = ?4, updated_seq = ?5,
+                   updated_at = ?6 WHERE id = ?1",
+                params![idea, reason, digest, ground, seq, at],
             )?
         }
         "idea.qualified"

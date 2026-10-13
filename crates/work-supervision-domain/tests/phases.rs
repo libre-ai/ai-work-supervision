@@ -379,6 +379,7 @@ fn phase_blockers_come_after_dependencies_and_requests_and_before_the_rest() {
     let blockers = with_phase_blockers(
         vec![
             Blocker::DependencyPending(other.clone()),
+            Blocker::DependencyUnmerged(other.clone()),
             Blocker::RequestPending(request.clone()),
             Blocker::ScopeConflict(other.clone()),
         ],
@@ -388,13 +389,14 @@ fn phase_blockers_come_after_dependencies_and_requests_and_before_the_rest() {
         blockers,
         vec![
             Blocker::DependencyPending(other.clone()),
+            Blocker::DependencyUnmerged(other.clone()),
             Blocker::RequestPending(request.clone()),
             Blocker::PhaseUnapproved(Phase::Research),
             Blocker::PhaseUnapproved(Phase::Outline),
             Blocker::ScopeConflict(other),
         ]
     );
-    assert_eq!(blockers[2].code(), "phase.unapproved");
+    assert_eq!(blockers[3].code(), "phase.unapproved");
     let accept = with_phase_blockers(
         vec![Blocker::RequestPending(request), Blocker::CheckRunning],
         &[Phase::Design],

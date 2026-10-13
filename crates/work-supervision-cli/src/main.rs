@@ -29,7 +29,7 @@
 //! ws idea add <text> [--session <id>]
 //! ws idea qualify <id> [--repository <r>] [--mission <id>] [--context <c>] [--session <id>]
 //! ws idea promote <id> --title <t> [--repository <r>] [--brief <file>] [--criterion <c>]…
-//! ws idea dismiss <id> --reason <r>
+//! ws idea dismiss <id> --ground implemented|refused|other --reason <r>
 //! ws idea list
 //! ws request open --question <q> --option <reversibility>:<label>:<consequence>…
 //!                 [--mission <id>] [--recommended <n>] [--session <id>]
@@ -49,6 +49,7 @@
 //! ws artifact return <artifact> --reason <r>
 //! ws artifact list <id>
 //! ws artifact show <artifact>
+//! ws outline split <id> <artifact> <plan file>   (approved outline → draft missions)
 //! ```
 //!
 //! Results are JSON on standard output. A refusal prints `ws: <code>` on
@@ -233,6 +234,13 @@ fn run(arguments: Vec<OsString>) -> Result<Value, Exit> {
                 ),
             )
         }
+        ["outline", "split", id, artifact, file] => {
+            let plan = fs::read_to_string(file).map_err(|_| refused("plan.unreadable"))?;
+            request(
+                &layout,
+                &json!({ "op": "outline.split", "mission": id, "artifact": artifact, "plan": plan }),
+            )
+        }
         ["artifact", "approve", artifact, options @ ..] => {
             let options = Options::parse(options, &["--digest", "--reason"], &[])?;
             request(
@@ -343,8 +351,16 @@ fn simple_request(words: &[&str]) -> Result<Value, Exit> {
             json!({ "op": "mission.depend", "mission": id, "on": on })
         }
         ["check", id] => json!({ "op": "check.run", "mission": id }),
-        ["idea", "dismiss", id, "--reason", reason] => {
-            json!({ "op": "idea.dismiss", "idea": id, "reason": reason })
+        [
+            "idea",
+            "dismiss",
+            id,
+            "--ground",
+            ground,
+            "--reason",
+            reason,
+        ] => {
+            json!({ "op": "idea.dismiss", "idea": id, "ground": ground, "reason": reason })
         }
         ["idea", "list"] => json!({ "op": "idea.list" }),
         ["request", "answer", id, choice, "--reason", reason] => {

@@ -180,6 +180,9 @@ pub(crate) fn apply(
         kind if kind.starts_with("workflow.") || kind.starts_with("artifact.") => {
             crate::phases::project(transaction, kind, &fields, blobs, seq_value, at)
         }
+        kind if kind.starts_with("outline.split.") => {
+            crate::outline::project(transaction, kind, &fields, blobs, seq_value, at)
+        }
         kind if kind.starts_with("dependency.")
             || kind.starts_with("scope.")
             || kind.starts_with("check.") =>

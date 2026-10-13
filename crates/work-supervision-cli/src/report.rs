@@ -156,8 +156,11 @@ pub fn render(report: &Value) -> String {
     );
     let criteria = list(path(report, &["intent", "criteria"]));
     if !criteria.is_empty() {
-        let _ = writeln!(out, "\n| # | Criterion | Check | Last execution |");
-        let _ = writeln!(out, "| --- | --- | --- | --- |");
+        let _ = writeln!(
+            out,
+            "\n| # | Criterion | Check | Red at the base | Last execution |"
+        );
+        let _ = writeln!(out, "| --- | --- | --- | --- | --- |");
         for criterion in criteria {
             let check = if criterion["check"].is_null() {
                 "none".to_owned()
@@ -187,12 +190,19 @@ pub fn render(report: &Value) -> String {
                 };
                 format!("{verdict} (exit {}), {at}", text(&last["exit_code"]))
             };
+            // A criterion already true before the work proves nothing.
+            let red = match &criterion["red_at_base"] {
+                Value::Bool(true) => "yes",
+                Value::Bool(false) => "not seen",
+                _ => "—",
+            };
             let _ = writeln!(
                 out,
-                "| {} | {} | {} | {} |",
+                "| {} | {} | {} | {} | {} |",
                 text(&criterion["index"]),
                 cell(&criterion["text"]),
                 check.replace('|', "\\|"),
+                red,
                 execution
             );
         }

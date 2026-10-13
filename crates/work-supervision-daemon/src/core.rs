@@ -22,8 +22,8 @@ use work_supervision_worktree::{Git, Release, Worktrees};
 use crate::{Config, Failure, clock, fault};
 
 /// Default budgets of a mission created without explicit ones.
-const DEFAULT_DURATION_SECONDS: u64 = 600;
-const DEFAULT_OUTPUT_BYTES: u64 = 10 << 20;
+pub(crate) const DEFAULT_DURATION_SECONDS: u64 = 600;
+pub(crate) const DEFAULT_OUTPUT_BYTES: u64 = 10 << 20;
 /// Longest a `wait` request may block.
 const MAX_WAIT: Duration = Duration::from_secs(60);
 
@@ -63,6 +63,8 @@ pub(crate) struct Recovered {
     pub(crate) promotions_aborted: u64,
     pub(crate) scope_checks: u64,
     pub(crate) scope_check_failures: u64,
+    pub(crate) outline_splits_confirmed: u64,
+    pub(crate) outline_splits_aborted: u64,
 }
 
 pub(crate) fn lock(shared: &Shared) -> Result<MutexGuard<'_, Core>, Failure> {
@@ -383,6 +385,8 @@ pub(crate) fn report_json(recovered: &Recovered) -> Value {
         "promotions_aborted": recovered.promotions_aborted,
         "scope_checks_recorded": recovered.scope_checks,
         "scope_checks_failed": recovered.scope_check_failures,
+        "outline_splits_confirmed": recovered.outline_splits_confirmed,
+        "outline_splits_aborted": recovered.outline_splits_aborted,
     })
 }
 
@@ -495,45 +499,57 @@ fn show_core(core: &Core, mission: &Mission) -> Result<Value, Failure> {
     }))
 }
 
+/// Provisions the worktree of a `ready` mission at its repository's `HEAD`
+/// and records `mission.provisioned`. The caller has guarded it as a run.
+pub(crate) fn provision(core: &mut Core, mission: &Mission) -> Result<Mission, Failure> {
+    let id = mission.id();
+    if core.worktree_state(id)?.as_deref() != Some("created") {
+        let repository = core.config.repository(mission.repository())?.to_owned();
+        let base = core.worktrees.head_of(&repository)?;
+        let mut faults = fault::worktree_faults();
+        let Core {
+            worktrees,
+            supervisor,
+            ..
+        } = &mut *core;
+        worktrees
+            .provision(
+                supervisor,
+                &repository,
+                id,
+                mission.repository(),
+                &base,
+                &mut faults,
+                clock::now()?,
+            )
+            .map_err(fault::crash_on_worktree_fault)?;
+        fault::hit("worktree-confirmed");
+    }
+    let row = core
+        .supervisor
+        .store()
+        .worktree(id.as_str())?
+        .ok_or(Failure::new("worktree.not_provisioned"))?;
+    let base = work_supervision_domain::CommitId::parse(&row.base_commit)
+        .map_err(|_| Failure::new("projection.sqlite"))?;
+    let provisioned = core.execute(id, &Command::Provision { base_commit: base })?;
+    fault::hit("mission-provisioned");
+    Ok(provisioned)
+}
+
 fn run(shared: &Shared, id: &MissionId) -> Result<Value, Failure> {
     let mut core = lock(shared)?;
     if core.runs.contains_key(id.as_str()) {
         return Err(Failure::new("run.already_active"));
     }
+    // Checks at the base run in the worktree the agent would write in.
+    if core.checks.contains_key(id.as_str()) {
+        return Err(Failure::new("check.running"));
+    }
     let mission = core.mission(id)?;
     crate::coordination::guard_run(&core, &mission)?;
     if mission.state() == State::Ready {
-        if core.worktree_state(id)?.as_deref() != Some("created") {
-            let repository = core.config.repository(mission.repository())?.to_owned();
-            let base = core.worktrees.head_of(&repository)?;
-            let mut faults = fault::worktree_faults();
-            let Core {
-                worktrees,
-                supervisor,
-                ..
-            } = &mut *core;
-            worktrees
-                .provision(
-                    supervisor,
-                    &repository,
-                    id,
-                    mission.repository(),
-                    &base,
-                    &mut faults,
-                    clock::now()?,
-                )
-                .map_err(fault::crash_on_worktree_fault)?;
-            fault::hit("worktree-confirmed");
-        }
-        let row = core
-            .supervisor
-            .store()
-            .worktree(id.as_str())?
-            .ok_or(Failure::new("worktree.not_provisioned"))?;
-        let base = work_supervision_domain::CommitId::parse(&row.base_commit)
-            .map_err(|_| Failure::new("projection.sqlite"))?;
-        core.execute(id, &Command::Provision { base_commit: base })?;
-        fault::hit("mission-provisioned");
+        provision(&mut core, &mission)?;
     }
     let run = RunId::from_bytes(random_bytes()?);
     let mission = core.execute(id, &Command::StartRun { run: run.clone() })?;

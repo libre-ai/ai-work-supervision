@@ -643,3 +643,45 @@ fn inconsistent_coordination_events_are_refused_by_the_projection() {
     let unknown = world.append("idea.forgotten", json!({ "idea": idea }));
     assert_eq!(unknown.unwrap_err().code(), "projection.unknown_kind");
 }
+
+/// "Already implemented" and "refused" stay apart in the projection; a
+/// dismissal journalled before grounds existed keeps no ground rather than a
+/// guessed one, and an unknown ground is refused.
+#[test]
+fn a_dismissal_ground_is_projected_and_never_guessed() {
+    let idea = "44444444444444444444444444444444";
+    let ground_of = |world: &World| {
+        let ideas = world.supervisor.store().ideas().unwrap();
+        (ideas[0].state.clone(), ideas[0].dismiss_ground.clone())
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let (mut world, digest) = seeded(dir.path());
+    world
+        .append(
+            "idea.dismissed",
+            json!({ "idea": idea, "ground": "implemented", "reason_digest": digest }),
+        )
+        .unwrap();
+    assert_eq!(
+        ground_of(&world),
+        ("dismissed".to_owned(), Some("implemented".to_owned()))
+    );
+
+    let dir = tempfile::tempdir().unwrap();
+    let (mut world, digest) = seeded(dir.path());
+    world
+        .append(
+            "idea.dismissed",
+            json!({ "idea": idea, "reason_digest": digest }),
+        )
+        .unwrap();
+    assert_eq!(ground_of(&world), ("dismissed".to_owned(), None));
+
+    let dir = tempfile::tempdir().unwrap();
+    let (mut world, digest) = seeded(dir.path());
+    let refused = world.append(
+        "idea.dismissed",
+        json!({ "idea": idea, "ground": "rejected", "reason_digest": digest }),
+    );
+    assert_eq!(refused.unwrap_err().code(), "projection.event_invalid");
+}
