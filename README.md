@@ -29,4 +29,6 @@ Keep track of work entrusted to AI agents without losing sight of what you asked
 
 **Today:** source code and tests are present; local integration is underway. See the [development guide](docs/DEVELOPMENT.md) for setup and verification status.
 
+The [result and change acceptance guide (French)](docs/guides/result-and-change-acceptance.fr.md) helps describe what works for a given user and how a representative change can be verified. Its synthetic notes-export recipe is a proposal, not evidence of a qualified application or a new runtime gate.
+
 [Catalogue](https://github.com/libre-ai/.github/blob/main/profile/README.md) · [Contribute](https://github.com/libre-ai/.github/blob/main/CONTRIBUTING.md) · [Français](README.fr.md) · [CC BY 4.0 license](LICENSES/CC-BY-4.0.txt)
