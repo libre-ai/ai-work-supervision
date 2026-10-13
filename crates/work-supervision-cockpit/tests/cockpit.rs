@@ -609,6 +609,39 @@ fn a_decision_request_is_compared_and_answered_at_the_cockpit() {
         .unwrap();
     assert_eq!(missions.as_array().unwrap().len(), 2);
 
+    // A dismissal names its ground: already implemented is not refused.
+    let done = world
+        .client
+        .request(&json!({ "op": "idea.capture", "text": "cache the index" }))
+        .unwrap()["idea"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let page = http.get("/ideas", &cookie);
+    assert!(page.body.contains("<option value=\"implemented\">"));
+    let reply = http.post(
+        &format!("/ideas/{done}/dismiss"),
+        &cookie,
+        &format!("csrf={}&reason=exists", csrf(&page.body)),
+    );
+    assert_eq!(reply.status, 409, "a dismissal without a ground is refused");
+    let reply = http.post(
+        &format!("/ideas/{done}/dismiss"),
+        &cookie,
+        &format!(
+            "csrf={}&ground=implemented&reason=see+the+cache+module",
+            csrf(&page.body)
+        ),
+    );
+    assert_eq!(reply.status, 303, "{}", reply.body);
+    let page = http.get("/ideas", &cookie);
+    assert!(
+        page.body
+            .contains("<b>implemented</b> — see the cache module"),
+        "{}",
+        page.body
+    );
+
     // Sessions: what they declared, labelled as such.
     let page = http.get("/sessions", &cookie);
     assert!(page.body.contains("claude-code"));

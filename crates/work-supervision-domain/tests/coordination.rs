@@ -7,11 +7,11 @@
 )]
 
 use work_supervision_domain::coordination::{
-    Actor, Blocker, CheckOutcome, CoordinationRefusal, Harness, IdeaCommand, IdeaEvent, IdeaState,
-    IdeaView, ReportedState, RequestCommand, RequestEvent, RequestOption, RequestState,
-    RequestView, Reversibility, SessionCommand, SessionEvent, SessionOutcome, SessionState,
-    accept_blockers, apply_idea, check_actor_session, check_argv, check_dependency, check_draft,
-    decide_idea, decide_request, decide_session, holds_worktree, run_blockers,
+    Actor, Blocker, CheckOutcome, CoordinationRefusal, DismissGround, Harness, IdeaCommand,
+    IdeaEvent, IdeaState, IdeaView, ReportedState, RequestCommand, RequestEvent, RequestOption,
+    RequestState, RequestView, Reversibility, SessionCommand, SessionEvent, SessionOutcome,
+    SessionState, accept_blockers, apply_idea, check_actor_session, check_argv, check_dependency,
+    check_draft, decide_idea, decide_request, decide_session, holds_worktree, run_blockers,
 };
 use work_supervision_domain::scope::{ScopePath, outside, overlaps, parse_scope};
 use work_supervision_domain::{CommitId, IdeaId, MissionId, RequestId, SessionId, State};
@@ -178,6 +178,7 @@ fn an_idea_is_captured_qualified_promoted_through_an_intent() {
     // A promoted idea is closed.
     for command in [
         IdeaCommand::Dismiss {
+            ground: DismissGround::Other,
             reason: "x".to_owned(),
         },
         IdeaCommand::AbortPromotion,
@@ -273,11 +274,52 @@ fn idea_refusals_are_closed() {
             &idea(),
             Some(&view),
             &IdeaCommand::Dismiss {
+                ground: DismissGround::Refused,
                 reason: "no".to_owned()
             },
             &Actor::Session(session(1))
         ),
         Err(CoordinationRefusal::OwnerOnly)
+    );
+}
+
+#[test]
+fn a_dismissal_keeps_implemented_apart_from_refused() {
+    let captured = decide_idea(
+        &idea(),
+        None,
+        &IdeaCommand::Capture {
+            text: "memoise the tokenizer".to_owned(),
+        },
+        &Actor::Owner,
+    )
+    .unwrap();
+    let view = apply_idea(None, &captured);
+    for ground in DismissGround::ALL {
+        let event = decide_idea(
+            &idea(),
+            Some(&view),
+            &IdeaCommand::Dismiss {
+                ground: *ground,
+                reason: "see the cache module".to_owned(),
+            },
+            &Actor::Owner,
+        )
+        .unwrap();
+        assert_eq!(
+            event,
+            IdeaEvent::Dismissed {
+                idea: idea(),
+                ground: *ground,
+                reason: "see the cache module".to_owned(),
+            }
+        );
+    }
+    let names: Vec<&str> = DismissGround::ALL.iter().map(|g| g.as_str()).collect();
+    assert_eq!(names, ["implemented", "refused", "other"]);
+    assert_eq!(
+        DismissGround::parse("rejected").unwrap_err(),
+        CoordinationRefusal::FieldInvalid { field: "ground" }
     );
 }
 
@@ -656,7 +698,9 @@ fn run_blockers_follow_the_specified_order() {
             (mission(2), State::Running),
             (mission(3), State::Cancelled),
             (mission(4), State::Accepted),
+            (mission(6), State::Accepted),
         ],
+        &[mission(6)],
         &[request_id(1)],
         &[mission(5)],
     );
@@ -666,11 +710,63 @@ fn run_blockers_follow_the_specified_order() {
         [
             "dependency.unsatisfiable",
             "dependency.pending",
+            "dependency.unmerged",
             "request.pending",
             "scope.conflict"
         ]
     );
-    assert!(run_blockers(&[(mission(4), State::Accepted)], &[], &[]).is_empty());
+    assert!(run_blockers(&[(mission(4), State::Accepted)], &[], &[], &[]).is_empty());
+}
+
+#[test]
+fn only_an_accepted_dependency_can_be_unmerged() {
+    // A pending dependency is pending, not unmerged; a mission that is not a
+    // dependency at all never blocks.
+    let blockers = run_blockers(
+        &[(mission(2), State::Running), (mission(3), State::Accepted)],
+        &[mission(2), mission(7)],
+        &[],
+        &[],
+    );
+    assert_eq!(blockers, [Blocker::DependencyPending(mission(2))]);
+    assert_eq!(
+        run_blockers(&[(mission(3), State::Accepted)], &[mission(3)], &[], &[]),
+        [Blocker::DependencyUnmerged(mission(3))]
+    );
+}
+
+#[test]
+fn a_criterion_must_be_seen_red_at_the_base_before_acceptance() {
+    let submitted = commit('a');
+    let passing = |criterion| CheckOutcome {
+        criterion,
+        commit: submitted.clone(),
+        passed: true,
+    };
+    // Criterion 1 passes at the submitted commit but was never seen failing
+    // at the base: it proves nothing about the work.
+    assert_eq!(
+        accept_blockers(
+            &[],
+            false,
+            &[0, 1],
+            &[passing(0), passing(1)],
+            &[0],
+            Some(&submitted),
+            Some(0),
+        ),
+        [Blocker::CriteriaNotRedAtBase(1)]
+    );
+    // Unverified criteria come first.
+    assert_eq!(
+        accept_blockers(&[], false, &[0], &[], &[], Some(&submitted), None),
+        [
+            Blocker::CriteriaUnverified(0),
+            Blocker::CriteriaNotRedAtBase(0)
+        ]
+    );
+    // A criterion without a check has nothing to be red.
+    assert!(accept_blockers(&[], false, &[], &[], &[3], Some(&submitted), None).is_empty());
 }
 
 #[test]
@@ -691,6 +787,7 @@ fn accept_blockers_require_a_passing_check_at_the_submitted_commit() {
         true,
         &[0, 1],
         &[passed_elsewhere, failed_here],
+        &[0, 1],
         Some(&submitted),
         Some(2),
     );
@@ -709,8 +806,19 @@ fn accept_blockers_require_a_passing_check_at_the_submitted_commit() {
         commit: submitted.clone(),
         passed: true,
     };
-    assert!(accept_blockers(&[], false, &[0], &[passing], Some(&submitted), Some(0)).is_empty());
-    assert!(accept_blockers(&[], false, &[], &[], None, None).is_empty());
+    assert!(
+        accept_blockers(
+            &[],
+            false,
+            &[0],
+            &[passing],
+            &[0],
+            Some(&submitted),
+            Some(0)
+        )
+        .is_empty()
+    );
+    assert!(accept_blockers(&[], false, &[], &[], &[], None, None).is_empty());
 }
 
 #[test]

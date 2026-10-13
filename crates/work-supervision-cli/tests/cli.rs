@@ -771,6 +771,47 @@ fn phases_are_declared_submitted_and_approved_through_the_command_line() {
         "{markdown}"
     );
     assert_eq!(ws(root, &["artifact", "list"]).status.code(), Some(2));
+
+    // The approved outline becomes draft missions linked by dependencies.
+    let plan = setup.base.join("plan.json");
+    fs::write(
+        &plan,
+        r#"{"missions": [
+          {"key": "write", "title": "Write", "brief": "print hi", "demonstrates": "out.txt exists"},
+          {"key": "read", "title": "Read", "brief": "print hi", "demonstrates": "out.txt is read",
+           "after": ["write"]}
+        ]}"#,
+    )
+    .unwrap();
+    assert_eq!(
+        refusal(
+            root,
+            &["outline", "split", &id, &first, plan.to_str().unwrap()]
+        ),
+        "ws: outline.unapproved"
+    );
+    let split = ok(
+        root,
+        &["outline", "split", &id, &second, plan.to_str().unwrap()],
+    );
+    let write = split["missions"][0]["mission"].as_str().unwrap().to_owned();
+    let read = split["missions"][1]["mission"].as_str().unwrap().to_owned();
+    let shown = ok(root, &["mission", "show", &read]);
+    assert_eq!(shown["state"], "draft");
+    assert_eq!(shown["criteria"][0], "out.txt is read");
+    assert_eq!(shown["dependencies"][0]["mission"], write.as_str());
+    assert_eq!(shown["outline"]["planned_by"]["artifact"], second.as_str());
+    assert_eq!(
+        ok(root, &["mission", "show", &id])["outline"]["splits"][0]["state"],
+        "split"
+    );
+    assert_eq!(
+        refusal(
+            root,
+            &["outline", "split", &id, &second, plan.to_str().unwrap()]
+        ),
+        "ws: outline.already_split"
+    );
     daemon.kill().unwrap();
     daemon.wait().unwrap();
 }

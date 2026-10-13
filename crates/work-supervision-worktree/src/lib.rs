@@ -397,6 +397,39 @@ impl Worktrees {
         CommitId::parse(&head).map_err(|_| WorktreeError::Git)
     }
 
+    /// Whether `ancestor` is in the history of `descendant` in `repository`
+    /// (`git merge-base --is-ancestor`; a commit contains itself).
+    ///
+    /// Both commits are resolved first: `--is-ancestor` exits 1 both for "not
+    /// contained" and for some unknown objects, and an unknown commit must be
+    /// an error, never read as a plain "not contained".
+    ///
+    /// # Errors
+    ///
+    /// [`WorktreeError::Git`], also when either commit is unknown.
+    pub fn contains(
+        &self,
+        repository: &Path,
+        ancestor: &CommitId,
+        descendant: &CommitId,
+    ) -> Result<bool, WorktreeError> {
+        for commit in [ancestor, descendant] {
+            if self.git.commit_of(repository, commit.as_str())?.is_none() {
+                return Err(WorktreeError::Git);
+            }
+        }
+        let output = self.git.output(
+            repository,
+            &[
+                "merge-base",
+                "--is-ancestor",
+                ancestor.as_str(),
+                descendant.as_str(),
+            ],
+        )?;
+        Ok(output.success)
+    }
+
     /// Paths changed between `base` and `head`, seen from the worktree of
     /// `mission` (`git diff --name-only -z --no-renames`): a rename lists both
     /// its old and its new path, so moving a file out of a scope is seen. A

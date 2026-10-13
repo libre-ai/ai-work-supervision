@@ -435,6 +435,7 @@ pub fn with_phase_blockers(mut blockers: Vec<Blocker>, unapproved: &[Phase]) -> 
                 blocker,
                 Blocker::DependencyUnsatisfiable(_)
                     | Blocker::DependencyPending(_)
+                    | Blocker::DependencyUnmerged(_)
                     | Blocker::RequestPending(_)
             )
         })

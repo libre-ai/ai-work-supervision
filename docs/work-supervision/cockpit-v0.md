@@ -15,7 +15,8 @@ the React cockpit of the frozen `apps/missions` is not reused.
 - Coordination (`coordination-v0.md`): `/decisions` shows the open decision
   requests with their options side by side — label, consequence,
   reversibility, recommendation — and answers or withdraws them; `/ideas`
-  lists deferred ideas and promotes or dismisses the open ones; `/sessions`
+  lists deferred ideas and promotes or dismisses the open ones (a dismissal
+  names its ground — already implemented, refused or other — shown first); `/sessions`
   lists declared agent sessions, labelled as declared, never verified. A
   mission page shows its scope, dependencies, checks with their last
   execution, requests and blockers. With a declared workflow (`phases-v0.md`)

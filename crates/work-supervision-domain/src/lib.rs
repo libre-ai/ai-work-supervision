@@ -55,6 +55,7 @@
 pub mod coordination;
 mod ids;
 mod model;
+pub mod outline;
 pub mod phases;
 pub mod scope;
 

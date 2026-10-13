@@ -38,6 +38,7 @@
 mod blob;
 mod coordination;
 mod error;
+mod outline;
 mod phases;
 mod projection;
 mod records;
@@ -54,6 +55,7 @@ use work_supervision_journal::{Digest, Entry, Head, Journal, replay};
 
 pub use blob::BlobStore;
 pub use error::StoreError;
+pub use outline::{OutlineSplitRow, Plan, PlannedMission, parse_plan};
 pub use phases::ArtifactRow;
 pub use records::{
     CheckExit, CheckRunRow, CriterionCheck, IdeaRow, OptionRow, RequestRow, ScopeCheckRow,

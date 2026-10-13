@@ -32,11 +32,36 @@ in this order, each once (`coordination.field_invalid: workflow` otherwise).
 | `design` | The options considered and the decision taken on each, with what was set aside. |
 | `product` | The problem, how success is measured, the solution as the user sees it. |
 | `system-design` | Contracts, schemas, stores, queues: what the system exposes and keeps. |
-| `program-design` | Call paths, files, types and signatures, test boundaries. |
-| `outline` | Vertical slices, each with its testable result, the files it changes and its automated and manual verifications. |
+| `program-design` | Call paths, files, types and signatures, test boundaries — the seams are chosen here, before any test is written (below). |
+| `outline` | Vertical slices, each with its testable result — what can be demonstrated once it is done —, the files it changes and its automated and manual verifications. Once approved, the owner may split it into linked missions (`coordination-v0.md`, « Outline split »). |
 
 `system-design` and `program-design` are two phases so that the two levels of
 a technical design are approved separately.
+
+**Test seams, in `program-design`.** The artifact names where the tests touch
+the code before a test exists, and the owner approves that choice with the
+rest. The seam is the highest one the behaviour can be observed through — a
+command, a protocol request, a public function — rather than an internal
+helper, and one seam for the whole change when one is enough. Each additional
+seam is justified by what the higher one cannot observe. A test written
+against a lower seam than needed verifies the current structure rather than
+the behaviour, and turns every later restructuring into test churn.
+
+**A decision that spans several sessions, in `design`.** When the choices of a
+mission will be made over several sessions, its `design` artifact holds three
+sections, kept from one revision to the next:
+
+- **Destination** — what the finished work is, in terms the owner can check;
+- **Not yet specified** — the open questions, each decided in a later
+  revision or by a decision request (`coordination-v0.md`), never assumed;
+- **Out of scope** — what this mission will not do.
+
+An item leaves *Out of scope* only through a revision the owner approves:
+any submission supersedes the approval of its phase and of every later one
+(below), so an agent that writes itself an exception into its own design has
+written an unapproved artifact, and the run and the acceptance wait for the
+owner again. No rule of the daemon reads these sections; the approval of the
+exact text is what holds them.
 
 **Precedence.** When two approved artifacts disagree, the later phase in the
 canonical order prevails; the brief comes before every phase. For what the

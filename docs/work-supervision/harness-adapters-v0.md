@@ -124,7 +124,32 @@ in addition to the C0 qualification of the confinement it runs in:
 | Approvals | the harness's own approval flow either disabled in favour of the confinement, or routed to a decision request — never auto-approved | `--permission-mode`, `--permission-prompts none` refuses | `--sandbox`, hooks may answer `PermissionRequest` | none built in |
 | Result | a commit in the mission worktree and an evidence file; the summary is the owner's to read, the checks are what verifies | — | `-o <file>` writes the last message | — |
 | Identity | the harness's session identifier hashed into the run, so bridge reports and runs meet | `session_id` | `session_id` / `thread-id` | session file / `session_id` |
+| Delegation | a maximum **depth** (how many levels of sub-agents below the launched one) and a maximum **fan-out** (sub-agents alive at once), both explicit in the profile; enforced by the confinement or the harness, never by asking the agent; a profile whose harness cannot be held to them gets depth 0 | `--disallowedTools` can remove the sub-agent tool (read in `--help` of 2.1.296 on 2026-10-13; the tool's name not verified by a run) | no bound found in `--help` of 0.160.1 on 2026-10-13: depth 0 unless the confinement bounds processes | `--exclude-tools` / `--tools` (read in `--help` of 1.1.0 on 2026-10-13); no sub-agent tool built in, an extension may add one |
 
-The profile, its argument template and its environment allowlist will be
-code in `crates/work-supervision-pty` and `crates/work-supervision-domain`,
-reviewed with the C0 evidence; never a configuration value.
+The profile, its argument template, its environment allowlist and its
+delegation bounds will be code in `crates/work-supervision-pty` and
+`crates/work-supervision-domain`, reviewed with the C0 evidence; never a
+configuration value. A sub-agent lives inside the run that started it: the
+run's duration budget holds for its whole process group, which the end of the
+run kills (`pty-v0.md`), so delegation never extends a run.
+
+### Vocabulary of a run
+
+Four words name what an executor profile and a mission fix about a run, so a
+workflow is written the same way whatever the harness:
+
+- **trigger** — what starts a run. In v0 only the owner does (`ws run`, after
+  the guards); no event or schedule starts one, so there is no trigger to
+  configure.
+- **checkpoint** — where a run stops for the owner: waiting for input, an
+  open decision request, a declared phase without its approved artifact, a
+  submitted result waiting for its decision. A run never passes a checkpoint
+  by itself.
+- **push right** — who may write outside the worktree. No executor has it:
+  the result is a commit in the mission worktree, Work Supervision never
+  pushes, and publishing an accepted result is the owner's act
+  (`coordination-v0.md`, « Parallel frontier »).
+- **brief** — what the run is given: the mission's brief, frozen at `ready`
+  with its criteria, scope, checks and dependencies. A brief is complete when
+  the implementer can finish without asking a question; what it leaves open
+  goes to a decision request before the run, not during it.

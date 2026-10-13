@@ -13,8 +13,9 @@ use std::time::Duration;
 use serde_json::{Map, Value, json};
 use sha2::{Digest as _, Sha256};
 use work_supervision_domain::coordination::{
-    Actor, Blocker, Harness, IdeaCommand, ReportedState, RequestCommand, RequestOption,
-    Reversibility, SessionCommand, SessionOutcome, accept_blockers, holds_worktree, run_blockers,
+    Actor, Blocker, DismissGround, Harness, IdeaCommand, ReportedState, RequestCommand,
+    RequestOption, Reversibility, SessionCommand, SessionOutcome, accept_blockers, holds_worktree,
+    run_blockers,
 };
 use work_supervision_domain::phases::with_phase_blockers;
 use work_supervision_domain::scope::{outside, overlaps};
@@ -62,7 +63,7 @@ const OPEN_OPS: [&str; 13] = [
 ];
 
 /// Every operation of this module.
-const OPS: [&str; 20] = [
+const OPS: [&str; 21] = [
     "idea.capture",
     "idea.qualify",
     "idea.promote",
@@ -83,6 +84,7 @@ const OPS: [&str; 20] = [
     "mission.report",
     "check.run",
     "decisions.pending",
+    "outline.split",
 ];
 
 pub(crate) fn invalid() -> Failure {
@@ -190,6 +192,7 @@ pub(crate) fn handle(shared: &Shared, op: &str, request: &Value) -> Result<Value
         "idea.dismiss" => {
             let id = IdeaId::parse(field(request, "idea")?).map_err(|_| invalid())?;
             let command = IdeaCommand::Dismiss {
+                ground: DismissGround::parse(field(request, "ground")?).map_err(|_| invalid())?,
                 reason: field(request, "reason")?.to_owned(),
             };
             lock(shared)?
@@ -214,6 +217,7 @@ pub(crate) fn handle(shared: &Shared, op: &str, request: &Value) -> Result<Value
                             "context": idea.context,
                             "promoted_mission": idea.promoted_mission,
                             "dismiss_reason": idea.dismiss_reason,
+                            "dismiss_ground": idea.dismiss_ground,
                             "captured_at": idea.created_at,
                         })
                     })
@@ -350,6 +354,7 @@ pub(crate) fn handle(shared: &Shared, op: &str, request: &Value) -> Result<Value
             report(&core, &mission)
         }
         "check.run" => run_checks(shared, &mission_field(request)?),
+        "outline.split" => crate::outline::split(shared, request),
         _ => Err(Failure::new("request.unknown_op")),
     }
 }
@@ -532,15 +537,67 @@ impl Snapshot {
     }
 }
 
+/// The accepted dependencies of `mission`, in its repository, whose result is
+/// not in the history its run starts from: the worktree's base once
+/// provisioned, the repository's `HEAD` (what a provisioning would take)
+/// before. Acceptance keeps a result on `ws/<mission>`; only a merge into the
+/// branch the repository has checked out puts it under the dependent work.
+///
+/// Fails closed: a containment git cannot establish (unknown commit, git
+/// failing, an accepted mission without a commit) counts as unmerged. A
+/// dependency in another repository has no commit to look for here and is
+/// held by its acceptance only.
+fn unmerged_dependencies(
+    core: &Core,
+    mission: &Mission,
+    dependencies: &[(MissionId, State)],
+) -> Result<Vec<MissionId>, Failure> {
+    let accepted: Vec<&MissionId> = dependencies
+        .iter()
+        .filter(|(_, state)| *state == State::Accepted)
+        .map(|(id, _)| id)
+        .collect();
+    if accepted.is_empty() {
+        return Ok(Vec::new());
+    }
+    let Ok(repository) = core.config.repository(mission.repository()) else {
+        return Ok(accepted.into_iter().cloned().collect());
+    };
+    let base = match mission.base_commit() {
+        Some(base) => Some(base.clone()),
+        None => core.worktrees.head_of(repository).ok(),
+    };
+    let mut unmerged = Vec::new();
+    for id in accepted {
+        let dependency = core.mission(id)?;
+        if dependency.repository() != mission.repository() {
+            continue;
+        }
+        let contained = match (dependency.result(), &base) {
+            (Some(result), Some(base)) => core
+                .worktrees
+                .contains(repository, result.commit(), base)
+                .unwrap_or(false),
+            _ => false,
+        };
+        if !contained {
+            unmerged.push(id.clone());
+        }
+    }
+    Ok(unmerged)
+}
+
 fn run_blockers_of(
     core: &Core,
     mission: &Mission,
     snapshot: &Snapshot,
 ) -> Result<Vec<Blocker>, Failure> {
     let store = core.supervisor.store();
+    let dependencies = store.dependencies_of(mission.id())?;
     Ok(with_phase_blockers(
         run_blockers(
-            &store.dependencies_of(mission.id())?,
+            &dependencies,
+            &unmerged_dependencies(core, mission, &dependencies)?,
             &store.open_requests_of(mission.id())?,
             &snapshot.conflicts(mission),
         ),
@@ -563,12 +620,17 @@ fn accept_blockers_of(core: &Core, mission: &Mission) -> Result<Vec<&'static str
         .iter()
         .map(|check| check.criterion)
         .collect();
+    let red_at_base = match mission.base_commit() {
+        Some(base) => store.red_at(mission.id(), base)?,
+        None => Vec::new(),
+    };
     let blockers = with_phase_blockers(
         accept_blockers(
             &store.open_requests_of(mission.id())?,
             core.checks.contains_key(mission.id().as_str()),
             &declared,
             &store.check_outcomes(mission.id())?,
+            &red_at_base,
             submitted.as_ref(),
             scope_check
                 .as_ref()
@@ -696,8 +758,13 @@ pub(crate) fn record_scope_check(core: &mut Core, id: &MissionId) -> Result<Opti
 
 fn run_checks(shared: &Shared, id: &MissionId) -> Result<Value, Failure> {
     let mut core = lock(shared)?;
-    let mission = core.mission(id)?;
-    if mission.state() != State::ResultSubmitted {
+    let mut mission = core.mission(id)?;
+    // At the base (before any run) or at the submitted commit: the first
+    // shows a criterion red before the work, the second green after it.
+    if !matches!(
+        mission.state(),
+        State::Ready | State::Provisioned | State::ResultSubmitted
+    ) {
         return Err(Failure::new("check.not_submitted"));
     }
     if core.checks.contains_key(id.as_str()) {
@@ -707,10 +774,17 @@ fn run_checks(shared: &Shared, id: &MissionId) -> Result<Value, Failure> {
     if declared.is_empty() {
         return Err(Failure::new("check.none_declared"));
     }
-    let commit = mission
-        .result()
-        .map(|result| result.commit().clone())
-        .ok_or(Failure::new("check.not_submitted"))?;
+    if mission.state() == State::Ready {
+        // The base checks run in the mission's own worktree, provisioned as
+        // a run would provision it, so they pass the same guards first.
+        guard_run(&core, &mission)?;
+        mission = crate::core::provision(&mut core, &mission)?;
+    }
+    let commit = match mission.state() {
+        State::ResultSubmitted => mission.result().map(|result| result.commit().clone()),
+        _ => mission.base_commit().cloned(),
+    }
+    .ok_or(Failure::new("check.not_submitted"))?;
     let at_commit = core.worktree_state(id)?.as_deref() == Some("created")
         && core.worktrees.is_clean(id)?
         && core
@@ -765,7 +839,8 @@ fn run_one_check(
     let check = CheckId::from_bytes(random_bytes()?);
     let session = {
         let mut core = lock(shared)?;
-        // Every check runs on the submitted commit, clean: a previous check
+        // Every check runs on the commit of its series (the base or the
+        // submitted commit), clean: a previous check
         // (or the code it ran) may have committed or written in the worktree.
         let at_commit = core.worktree_state(mission)?.as_deref() == Some("created")
             && core.worktrees.is_clean(mission)?
@@ -883,6 +958,7 @@ pub(crate) fn mission_extras(core: &Core, mission: &Mission) -> Result<Value, Fa
         "check_runs": check_runs_json(core, mission)?,
         "requests": store.requests_of(mission.id().as_str())?.iter().map(request_json).collect::<Vec<_>>(),
         "phases": crate::phases::mission_phases_json(core, mission)?,
+        "outline": crate::outline::mission_json(core, mission)?,
         "blockers": blocker_codes(core, mission)?,
         "checks_running": core.checks.contains_key(mission.id().as_str()),
     }))
@@ -920,6 +996,10 @@ pub(crate) fn report(core: &Core, mission: &Mission) -> Result<Value, Failure> {
         None => None,
     };
     let requests = store.requests_of(id.as_str())?;
+    let red_at_base = match mission.base_commit() {
+        Some(base) => store.red_at(id, base)?,
+        None => Vec::new(),
+    };
     let criteria: Vec<Value> = mission
         .criteria()
         .iter()
@@ -935,6 +1015,7 @@ pub(crate) fn report(core: &Core, mission: &Mission) -> Result<Value, Failure> {
                 "text": text,
                 "check": check.map(|check| json!({ "argv": check.argv })),
                 "verified": check.map(|_| verified(&check_runs, position, submitted.as_deref())),
+                "red_at_base": check.map(|_| red_at_base.contains(&position)),
                 "last_execution": last.map(|row| json!({
                     "commit": row.commit,
                     "state": row.state,
@@ -964,6 +1045,12 @@ pub(crate) fn report(core: &Core, mission: &Mission) -> Result<Value, Failure> {
         .any(|check| !verified(&check_runs, check.criterion, submitted.as_deref()));
     if unverified {
         gaps.push("criteria.unverified");
+    }
+    if checks
+        .iter()
+        .any(|check| !red_at_base.contains(&check.criterion))
+    {
+        gaps.push("criteria.not_red_at_base");
     }
     if scope.is_none() {
         gaps.push("scope.undeclared");
@@ -1133,6 +1220,7 @@ pub(crate) fn recover(core: &mut Core, recovered: &mut Recovered) -> Result<(), 
         core.supervisor
             .idea(&id, &command, &Actor::Owner, clock::now()?)?;
     }
+    crate::outline::recover(core, recovered)?;
     for mission in core.supervisor.missions()? {
         let Some(result) = mission.result() else {
             continue;

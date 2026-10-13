@@ -271,6 +271,11 @@
           "name": "updated_at",
           "type": "text",
           "nullable": false
+        },
+        {
+          "name": "dismiss_ground",
+          "type": "text",
+          "nullable": true
         }
       ],
       "primary_key": ["id"]
@@ -556,6 +561,78 @@
         }
       ],
       "primary_key": ["id"]
+    },
+    {
+      "name": "outline_missions",
+      "columns": [
+        {
+          "name": "artifact_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "position",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "mission_id",
+          "type": "text",
+          "nullable": false
+        }
+      ],
+      "primary_key": ["artifact_id", "position"]
+    },
+    {
+      "name": "outline_splits",
+      "columns": [
+        {
+          "name": "artifact_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "mission_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "plan",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "plan_digest",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "intent_seq",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "intent_at",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "decided_seq",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "decided_at",
+          "type": "text",
+          "nullable": true
+        }
+      ],
+      "primary_key": ["artifact_id"]
     },
     {
       "name": "projection_position",
