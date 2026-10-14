@@ -275,7 +275,33 @@ impl Supervisor {
     }
 }
 
-const SPLIT_COLUMNS: &str = "artifact_id, mission_id, state, plan, intent_at, decided_at";
+/// The column a split lookup filters on. Each variant maps to a complete
+/// literal query, so no SQL text is ever assembled at run time.
+#[derive(Debug, Clone, Copy)]
+enum SplitFilter {
+    Artifact,
+    Mission,
+    State,
+}
+
+impl SplitFilter {
+    const fn sql(self) -> &'static str {
+        match self {
+            Self::Artifact => {
+                "SELECT artifact_id, mission_id, state, plan, intent_at, decided_at \
+                 FROM outline_splits WHERE artifact_id = ?1 ORDER BY intent_seq"
+            }
+            Self::Mission => {
+                "SELECT artifact_id, mission_id, state, plan, intent_at, decided_at \
+                 FROM outline_splits WHERE mission_id = ?1 ORDER BY intent_seq"
+            }
+            Self::State => {
+                "SELECT artifact_id, mission_id, state, plan, intent_at, decided_at \
+                 FROM outline_splits WHERE state = ?1 ORDER BY intent_seq"
+            }
+        }
+    }
+}
 
 impl Store {
     /// What the split rules need of `artifact`.
@@ -309,10 +335,12 @@ impl Store {
         Ok(rows)
     }
 
-    fn splits_where(&self, filter: &str, value: &str) -> Result<Vec<OutlineSplitRow>, StoreError> {
-        let mut statement = self.connection().prepare(&format!(
-            "SELECT {SPLIT_COLUMNS} FROM outline_splits WHERE {filter} ORDER BY intent_seq"
-        ))?;
+    fn splits_where(
+        &self,
+        filter: SplitFilter,
+        value: &str,
+    ) -> Result<Vec<OutlineSplitRow>, StoreError> {
+        let mut statement = self.connection().prepare(filter.sql())?;
         let rows = statement
             .query_map([value], |row| {
                 Ok(OutlineSplitRow {
@@ -340,7 +368,7 @@ impl Store {
     ///
     /// [`StoreError::Sqlite`].
     pub fn outline_split(&self, artifact: &str) -> Result<Option<OutlineSplitRow>, StoreError> {
-        Ok(self.splits_where("artifact_id = ?1", artifact)?.pop())
+        Ok(self.splits_where(SplitFilter::Artifact, artifact)?.pop())
     }
 
     /// The splits of the outlines of `mission`, oldest first.
@@ -352,7 +380,7 @@ impl Store {
         &self,
         mission: &MissionId,
     ) -> Result<Vec<OutlineSplitRow>, StoreError> {
-        self.splits_where("mission_id = ?1", mission.as_str())
+        self.splits_where(SplitFilter::Mission, mission.as_str())
     }
 
     /// Splits still under way (recovery).
@@ -361,7 +389,7 @@ impl Store {
     ///
     /// [`StoreError::Sqlite`].
     pub fn pending_outline_splits(&self) -> Result<Vec<OutlineSplitRow>, StoreError> {
-        self.splits_where("state = ?1", SplitState::Splitting.as_str())
+        self.splits_where(SplitFilter::State, SplitState::Splitting.as_str())
     }
 
     /// The split that planned `mission`: outline artifact, its mission and
