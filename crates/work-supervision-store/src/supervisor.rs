@@ -97,6 +97,8 @@ impl Layout {
 pub enum SupervisorError {
     /// The domain refused the command; nothing was written.
     Refused(Refusal),
+    /// A coordination rule refused the command; nothing was written.
+    Coordination(work_supervision_domain::coordination::CoordinationRefusal),
     /// The projection or the blob store failed.
     Store(StoreError),
     /// The journal failed.
@@ -109,6 +111,7 @@ impl SupervisorError {
     pub const fn code(&self) -> &'static str {
         match self {
             Self::Refused(refusal) => refusal.code(),
+            Self::Coordination(refusal) => refusal.code(),
             Self::Store(error) => error.code(),
             Self::Journal(_) => "journal.invalid",
         }
@@ -119,6 +122,7 @@ impl std::fmt::Display for SupervisorError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Refused(refusal) => refusal.fmt(formatter),
+            Self::Coordination(refusal) => refusal.fmt(formatter),
             Self::Store(error) => error.fmt(formatter),
             Self::Journal(error) => error.fmt(formatter),
         }

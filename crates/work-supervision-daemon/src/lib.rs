@@ -15,10 +15,13 @@
 mod anchor;
 mod clock;
 mod config;
+mod coordination;
 mod core;
 mod failure;
 mod fault;
+mod outline;
 mod peer;
+mod phases;
 mod protocol;
 mod root;
 mod server;

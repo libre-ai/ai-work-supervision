@@ -508,3 +508,65 @@ fn git_runs_without_the_host_environment_shell_or_hooks() {
         vec!["GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM", "LC_ALL", "PATH"]
     );
 }
+
+#[test]
+fn containment_follows_history_and_an_unknown_commit_is_an_error() {
+    let fixture = fixture();
+    let manager = worktrees(&fixture);
+    // A side branch the base does not contain, then a later commit on main.
+    host_git(&fixture.repo, &["switch", "-q", "-c", "side"]);
+    fs::write(fixture.repo.join("side.txt"), "side\n").unwrap();
+    host_git(&fixture.repo, &["add", "side.txt"]);
+    host_git(
+        &fixture.repo,
+        &[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "side",
+        ],
+    );
+    let side = CommitId::parse(host_git(&fixture.repo, &["rev-parse", "HEAD"]).trim()).unwrap();
+    host_git(&fixture.repo, &["switch", "-q", "main"]);
+    assert!(
+        manager
+            .contains(&fixture.repo, &fixture.base, &fixture.base)
+            .unwrap()
+    );
+    assert!(
+        manager
+            .contains(&fixture.repo, &fixture.base, &side)
+            .unwrap()
+    );
+    assert!(
+        !manager
+            .contains(&fixture.repo, &side, &fixture.base)
+            .unwrap()
+    );
+    host_git(
+        &fixture.repo,
+        &[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@example.invalid",
+            "merge",
+            "-q",
+            "--no-ff",
+            "-m",
+            "merge side",
+            "side",
+        ],
+    );
+    let merged = manager.head_of(&fixture.repo).unwrap();
+    assert!(manager.contains(&fixture.repo, &side, &merged).unwrap());
+    let unknown = CommitId::parse(&"d".repeat(40)).unwrap();
+    assert!(matches!(
+        manager.contains(&fixture.repo, &unknown, &merged),
+        Err(WorktreeError::Git)
+    ));
+}

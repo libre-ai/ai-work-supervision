@@ -15,4 +15,6 @@ Suivre le travail confié à des agents IA en gardant une vue claire de la deman
 
 **Aujourd’hui :** le code et les tests sont présents ; leur intégration locale est en cours. Le [guide de développement](docs/DEVELOPMENT.md) décrit l’installation et les vérifications.
 
+Le [guide d’acceptation du résultat et de son évolution](docs/guides/result-and-change-acceptance.fr.md) aide à préciser ce qui fonctionne pour un usage donné et comment éprouver un changement représentatif. Sa recette synthétique d’export de notes reste une proposition ; elle ne qualifie aucune application et n’ajoute aucun contrôle runtime.
+
 [Catalogue](https://github.com/libre-ai/.github/blob/main/profile/README.fr.md) · [Contribuer](https://github.com/libre-ai/.github/blob/main/CONTRIBUTING.md) · [English](README.md) · [Licence CC BY 4.0](LICENSES/CC-BY-4.0.txt)
