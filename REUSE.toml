@@ -4,7 +4,7 @@ version = 1
 path = ["**"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Constantin Jais"
-SPDX-License-Identifier = "MIT"
+SPDX-License-Identifier = "EUPL-1.2"
 
 # Grafted hub content and workspace bootstrap (ADR-0020, γ 3.5).
 [[annotations]]
