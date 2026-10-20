@@ -7,6 +7,7 @@ of work entrusted to AI agents, what is blocked and what was actually done.
 Doctrine lives upstream: https://raw.githubusercontent.com/libre-ai/project-governance/HEAD/AGENTS.md
 Project state has one authority, `project.v1.yaml`; the README "Project
 status" section is generated from it — never edit that section by hand.
+Product objectives and work packages have one source, `docs/prd.md`.
 
 ## Boundaries
 
