@@ -23,7 +23,7 @@ non_goals:
 dependencies:
   - "on": "libre-ai/project-governance"
     why: "Current fleet doctrine and reusable verification workflows."
-    pinned: "github:libre-ai/project-governance#0db2e10e3ea785c31c101914483ed501ec4cbb7a"
+    pinned: "github:libre-ai/project-governance#b0a5ff0cb0278835c4f6f4bde0f34df8397cc4a3"
 maturity: "idea"
 confidence: "medium"
 exposure: "idea"
