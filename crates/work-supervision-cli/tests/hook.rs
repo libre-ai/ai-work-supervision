@@ -1,3 +1,4 @@
+// Proof of the work-package link gate (WP-3); this change is never merged.
 #![allow(
     missing_docs,
     clippy::unwrap_used,
