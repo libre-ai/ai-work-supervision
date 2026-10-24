@@ -384,7 +384,7 @@ La colonne « Déclaré / importé » distingue la déclaration (`overrides` de 
 
 | Dépôt | Nature | Déclaré / importé | Source |
 | --- | --- | --- | --- |
-| `project-governance` | gabarit de flotte (`validate-composition.yml@b0a5ff0c`), outillage `@libre-ai/governance`, doctrine ADR-0042 et 2026-09-29, design `docs/architecture/forge/` | déclaré ; workflow | `.github/workflows/code-validation.yml:13` ; `project.v1.yaml:23-26` |
+| `project-governance` | gabarit de flotte (`validate-composition.yml`, à la génération de `code-validation.yml:13`), outillage `@libre-ai/governance`, doctrine ADR-0042 et 2026-09-29, design `docs/architecture/forge/` | déclaré ; workflow | `.github/workflows/code-validation.yml:13` ; `project.v1.yaml:23-26` |
 | `schemas-and-contracts` | `@libre-ai/contracts-authority`, `sdk-ts` (`contracts`), `envelope` pour le code récupéré ; contrats `missions-api.v3` (locked, `contracts/STATUS.md:122, 169`), `execution-authorization-v4` (candidate, `:101`), `harness-profile-v3` (candidate, `:112`), `tool-invocation-observation-v1` (candidate, `:159`) ; `execution-plan-body` et `orchestrator-event` cités par `docs/apps/missions.md` et `docs/apps/agent-board.md` ; **aucun contrat consommé par le cœur Rust v0** | `contracts` : importé (3) ; `contracts-authority`, `envelope` : déclarés, 0 import | `package.json:13-15` |
 | `application-development-toolkit` | `ui`, `web-platform`, `testing` pour `apps/*` | `web-platform` 7, `testing` 7 importés ; `ui` déclaré, 0 import | `package.json:16-18` |
 | `organization-data-lifecycle` | `data`, `rgpd-kit` pour `apps/*` | `data` 11 importé ; `rgpd-kit` déclaré, 0 import | `package.json:19-20` |
