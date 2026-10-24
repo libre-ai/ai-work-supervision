@@ -8,7 +8,8 @@ Provenance : ce document reprend la spécification de mission `specs/ai-work-sup
 de l'analyse du 2026-10-14. Seuls changements : la ligne qui déclare le niveau de ce texte (ci-dessus), la
 section 11 (paquets de travail) et des réécritures de forme exigées par la norme des paquets de
 travail de `libre-ai/project-governance` (`docs/specifications/WORK-PACKAGES.md`) : chaque
-paramètre écrit entre chevrons y est écrit en capitales (`HARNESS`, `JOURNAL`, `ORG/DEPOT`).
+paramètre écrit entre chevrons y est écrit en capitales (`HARNESS`, `JOURNAL`, `ORG/DEPOT`). Une
+correction s'y ajoute : le rattachement de P15 à `libre-ai/signalement` (ADR-0055 D2, D94).
 `cahier-des-charges.md` est à côté de ce fichier ; `architecture.md`, `tests-et-evaluation.md`,
 `questions-ouvertes.md`, `CADRAGE.md`, `HANDOFF-phase-0.md`, `clones.json` et `inventaire/`
 désignent l'analyse de mission et ne sont pas dans ce dépôt.
@@ -163,7 +164,9 @@ Autres chevauchements nommés, sans fusion de specs : `execution-sandbox` (C0, d
 bloquante de B′ ; CA-3, CA-15, RK-1 ; attend aussi que ce dépôt embarque `libre-ai-harness`), `pi-evidence` (format
 de preuve, Q6), `capability-authorization` (acteur déclaratif et autorisation, Q5 ; la moitié
 applicative de la matrice, `apps/missions/src/authz/mission-authorization.ts:1-7`, est rangée ici
-dans le code gelé), `signalement` (P15, capture et Dossier), `execution-continuity-evaluator`
+dans le code gelé), `signalement` (capture et Dossier ; il porte P15, projets, tickets et support :
+ADR-0055 D2, D94 ; ce dépôt est la fabrique et ne porte aucune application du catalogue),
+`execution-continuity-evaluator`
 (P35, reprise ; attend un adaptateur `RunControlState` / `StartPreflight` et le rejeu de dix
 missions, et partage les familles `execution-plan-body`, `orchestrator-event`,
 `execution-authorization`), `artifact-verification` (sa lignée de contribution signée est

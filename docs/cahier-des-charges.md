@@ -157,9 +157,11 @@ hors outil, ce que B′ interdit explicitement (`0042…:78-80`).
 
 L'utilisateur primaire du socle est l'équipe qui pose les règles (CADRAGE §1.4) ; au SHA lu, cette
 équipe est une personne, le propriétaire, et la configuration déclarative est `config.toml`
-(`crates/work-supervision-daemon/src/config.rs:9-24`). Pour P15 et P35, que le catalogue associe à
-ce dépôt sans qu'il les nomme (`inventaire/catalogue-p-xx.json`, `depot_porteur: null`,
+(`crates/work-supervision-daemon/src/config.rs:9-24`). Pour P35, que le catalogue associe à ce
+dépôt sans qu'il le nomme (`inventaire/catalogue-p-xx.json`, `depot_porteur: null`,
 `grep -rlE '\bP15\b|\bP35\b' .clones/ai-work-supervision` → 0), l'utilisateur est le propriétaire.
+P15 (projets, tickets et support) n'est pas rattaché à ce dépôt : `libre-ai/signalement` le porte
+(ADR-0055 D2, entrée D94 du registre de `libre-ai/project-governance`).
 
 ## 4. Périmètre
 
@@ -186,8 +188,9 @@ ce dépôt sans qu'il les nomme (`inventaire/catalogue-p-xx.json`, `depot_porteu
 - Pousser sur la forge : « Work Supervision never pushes » (`coordination-v0.md:305-306`).
 - Multi-tenant, rôles, approbation tierce : dérogation I-09 pour la v0 (`0042…:138-145`) ; la
   phase `admission` v1 est déclarée mais sans critère atteint (`project.v1.yaml:42-49`).
-- Toute application du catalogue P01-P40 : la fabrique est hors catalogue (ADR-0042 §1) ; P15 et
-  P35 lui sont rattachés par le catalogue de phase 0 seulement (voir `prd.md` § Devenir).
+- Toute application du catalogue P01-P40 : la fabrique est hors catalogue (ADR-0042 §1) ; P35
+  lui est rattaché par le catalogue de phase 0 seulement (voir `prd.md` § Devenir) ; P15 est porté
+  par `signalement` (ADR-0055 D2, D94), la fabrique ne porte aucune application du catalogue.
 - Lecture du texte des agents par une règle du daemon : « no rule of the daemon reads its
   content » (`phases-v0.md:116-118`).
 
@@ -402,7 +405,7 @@ La colonne « Déclaré / importé » distingue la déclaration (`overrides` de 
 | `ai-model-policy` | H5 : contrat d'appel entre la supervision et l'évaluateur d'éligibilité ; le cycle est un cycle de déclarations | § 11.1 ; RK-3 |
 | `database-policy-inspector` | H2 : les 15 fichiers `.sql` de ce dépôt servent de corpus | `prd.md` § 10 |
 | `capability-authorization` | matrice d'autorisation ; moitié applicative `apps/missions/src/authz/mission-authorization.ts:1-7`, rangée ici dans le code gelé | Q5 ; `prd.md` § 10 |
-| `signalement`, `pi-evidence`, `personal-knowledge-workspace` | capture (P15), format de preuve, seconde moitié de B′ | `prd.md` § 10 ; Q6 ; CA-11 |
+| `signalement`, `pi-evidence`, `personal-knowledge-workspace` | capture (`signalement` porte P15, ADR-0055 D2), format de preuve, seconde moitié de B′ | `prd.md` § 10 ; Q6 ; CA-11 |
 
 ### 11.2 Externes
 
