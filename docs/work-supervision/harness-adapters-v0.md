@@ -153,3 +153,81 @@ workflow is written the same way whatever the harness:
   with its criteria, scope, checks and dependencies. A brief is complete when
   the implementer can finish without asking a question; what it leaves open
   goes to a decision request before the run, not during it.
+
+### Run end without a deliverable
+
+The deliverable of a run is the commit of the Result row: a worktree head
+that differs from the `base_commit` of `mission.provisioned`
+(`events-v0.md`). An `exit_code` of 0 in `run.exited`, or any terminal
+output, is never a result.
+
+The fact behind this rule was reported when this section was written and was
+not replayed here: a harness started in its plain-text form ended with exit
+code 0 and an empty output while its event trace carried the final message,
+and a suspension on the model provider's side produces the same ending. The
+consequence for a real profile: its launch form is the event form already
+listed in the Launch row, never the text form alone.
+
+A new attempt is a new run of the same mission, with a new run identifier and
+a new `runs/<run>/pty.log`; it is never a run restarted in place. A harness's
+own option to continue a session belongs to the profile's argument template,
+so to the code reviewed with the C0 evidence.
+
+In v0 only the owner starts a run (**trigger**, above): no automatic relaunch
+exists and none is specified here.
+
+Known limit, stated as it is: from `exited`, `mission-v0.md` admits only
+`submit-result` and `cancel`, so relaunching after a run without a deliverable
+goes today through submitting a result and rejecting it. Lifting that limit
+is a change of the state machine, outside this document.
+
+### Stall
+
+What v0 does when a run falls silent or does not end:
+
+- silence for `idle_after_ms` moves the mission to `waiting-input`: a
+  checkpoint for the owner, not an end. The mission returns to `running` when
+  output resumes;
+- a run ends by itself, by cancellation, or when the mission's
+  `max_duration_seconds` or `max_output_bytes` is overrun: `SIGTERM` to the
+  process group, then `SIGKILL` after `grace_ms`.
+
+The PTY session imposes these bounds (`pty-v0.md`, « Session »), never the
+adapter and never a request made to the agent. They are data — `idle_after_ms`
+and `grace_ms` under `[runs]` in the root's `config.toml`, the two budgets in
+the mission — unlike the profile, which is code.
+
+A real profile declares whether, for its launch form, silence can mean that
+the agent waits for input. When it cannot, the run stays bounded by the
+duration budget; this document specifies no shorter silence bound.
+
+### Adapter code is translation only
+
+A file of adapter code — today `adapters/pi/ws-bridge.ts`, later an executor
+profile — translates a protocol and decides nothing. The decision lives in
+the core (`ws hook`, `wsd`).
+
+What it may do:
+
+- read the fields of the payload or of the environment that its protocol
+  gives it;
+- call an executable of the core (`ws`) by argument vector, without a shell;
+- bound that call in time and ignore its failure, so that it never stops the
+  session it observes.
+
+What it never does:
+
+- read the repository or the worktree;
+- filter events;
+- sanitise or rewrite a content;
+- count;
+- interpret the core's result beyond its exit code;
+- decide a verdict or an approval.
+
+A condition that belongs to the protocol itself is admitted; the example in
+this repository is doing nothing without `WS_ROOT`.
+
+This contract does not restate the factory's execution protocol, whose home
+is the governance repository:
+
+libre-ai/project-governance@67ca6d146f709ec3d37c06558398422bbec28dd9:docs/architecture/forge/EXECUTION-PROTOCOL.md

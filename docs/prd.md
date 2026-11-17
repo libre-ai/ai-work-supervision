@@ -204,7 +204,10 @@ tests est `two-way` (un retrait de test se défait par une PR) ; le paquet qui a
 d'exécuteur réel est `one-way`, car il lève le refus de tout agent réel avant C0 et ses effets
 hors confinement ne se défont pas, et il ajoute une dépendance et change la fiche publiée. Les
 paquets portant CA-15, CA-11 et CA-19 dépendent de C0 et de `execution-sandbox` (§ 10) ; le paquet
-de CA-19 précède celui de CA-15 et CA-11.
+de CA-19 précède celui de CA-15 et CA-11. Le dernier paquet de la table porte CA-20, critère
+ajouté au cahier avec le changement qui le tient : il n'ajoute que de la spécification et un test
+de structure, sans changement d'exécution, et son périmètre nomme aussi ce document et le cahier,
+que ce même changement modifie.
 
 | WP | CA-n couverts | Périmètre (chemins, globs) | Vérification (commande) | Porte anticipée |
 | --- | --- | --- | --- | --- |
@@ -218,3 +221,4 @@ de CA-19 précède celui de CA-15 et CA-11.
 | `WP-8` | `CA-18` | `crates/work-supervision-cli/tests/cli.rs` | `cargo test -p work-supervision-cli --locked --test cli` | `two-way` |
 | `WP-9` | `CA-19` | `crates/work-supervision-domain/tests/transitions.rs` | `cargo test -p work-supervision-domain --locked --test transitions` | `two-way` |
 | `WP-10` | `CA-15`, `CA-11` | `Cargo.toml`, `Cargo.lock`, `deny.toml`, `crates/work-supervision-domain/src/model.rs`, `project.v1.yaml` | `bun run check:native` | `one-way` |
+| `WP-11` | `CA-20` | `docs/work-supervision/harness-adapters-v0.md`, `docs/work-supervision/steering-surfaces-v0.md`, `crates/work-supervision-cli/tests/harness_adapters_spec.rs`, `docs/prd.md`, `docs/cahier-des-charges.md` | `cargo test -p work-supervision-cli --locked --test harness_adapters_spec` | `two-way` |

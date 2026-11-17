@@ -7,7 +7,8 @@ Provenance : ce document reprend la spécification de mission
 des réécritures de forme exigées par la norme des paquets de travail de
 `libre-ai/project-governance` (`docs/specifications/WORK-PACKAGES.md`) : chaque paramètre écrit
 entre chevrons y est écrit en capitales (`HARNESS`, `ID`, `CODE`, `L`, `JOURNAL`, `ORG/DEPOT`).
-Le texte des critères CA-1 à CA-19 est inchangé à ces réécritures près. `prd.md` est à côté de ce
+Le texte des critères CA-1 à CA-19 est inchangé à ces réécritures près ; le critère CA-20 leur est
+ajouté à la suite (§ 9), avec le changement qui le tient. `prd.md` est à côté de ce
 fichier ; `architecture.md`, `tests-et-evaluation.md`, `questions-ouvertes.md`, `CADRAGE.md`,
 `HANDOFF-phase-0.md`, `clones.json`, `inventaire/` et `specs/` désignent l'analyse de mission et ne
 sont pas dans ce dépôt.
@@ -369,6 +370,8 @@ d'exploitation. Le code récupéré `auth-web` tient sa propre redaction
 - CA-18 **Non atteint (test à écrire)** : pour N événements `PreToolUse` identiques reçus par `ws hook`, le nombre d'entrées `session.reported` journalisées est établi par un test et comparé à ce qu'I-33 (`docs/decisions/INVARIANTS.md:39`) tolère ; l'écart éventuel est consigné en Q13. Validation : test de `tests-et-evaluation.md` § 4.3.8 ; R-11 et CA-14 mesurent aussi un journal alimenté par le pont.
 
 - CA-19 **Non atteint (test à écrire)** (ajouté au recoupement de seconde famille du 2026-10-15) Aucun profil d'exécuteur autre que `fake` n'est ajouté tant qu'un test de contrat n'établit pas qu'aucune chaîne dérivée d'un contenu non fiable (brief figé, critères, artefacts) n'entre dans le contexte d'un modèle détenant un outil à effet, sauf en référence opaque (I-32). Prérequis de CA-3 et de CA-11 ; remplace la mention « hors périmètre v0 » du § 8.2. Validation : vecteurs rouges de provenance ; `grep -n 'I-32' specs/ai-work-supervision/*.md` renvoie ce critère.
+
+- CA-20 (ajouté avec les compléments du contrat d'adaptateur d'exécuteur, « spécifié, non activé ») Les trois sous-sections ajoutées au contrat (fin de run sans livrable, silence, code d'adaptateur limité à la traduction) suivent la ligne 155 de `docs/work-supervision/harness-adapters-v0.md` sans déplacer aucune des lignes que ce document cite par numéro, le tableau du contrat garde ses sept éléments, et `docs/work-supervision/steering-surfaces-v0.md` énumère les exigences S1 à S8 d'une surface de pilotage ; aucun comportement d'exécution ne change et aucune de ces exigences n'est vérifiée sur une surface. Validation : `cargo test -p work-supervision-cli --locked --test harness_adapters_spec`.
 
 ## 10. Critères d'abandon
 
