@@ -19,6 +19,7 @@ mod coordination;
 mod core;
 mod failure;
 mod fault;
+mod flow;
 mod outline;
 mod peer;
 mod phases;
