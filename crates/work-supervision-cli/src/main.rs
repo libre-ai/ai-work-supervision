@@ -50,11 +50,16 @@
 //! ws artifact list <id>
 //! ws artifact show <artifact>
 //! ws outline split <id> <artifact> <plan file>   (approved outline → draft missions)
+//!
+//! Flow (docs/work-supervision/flow-v0.md):
+//! ws flow                             (measures of the accepted missions)
 //! ```
 //!
 //! Results are JSON on standard output. A refusal prints `ws: <code>` on
 //! standard error and exits 1; a usage error exits 2. `ws journal verify`
 //! exits like `ws-journal-verify`: 0 valid, 1 invalid, 2 unreadable, 3 torn tail.
+//! `ws flow` prints its measures and exits 3 when an accepted mission could
+//! not be measured.
 //! `ws hook` writes nothing on standard output and always exits 0: a harness
 //! must never be stopped, nor given context, by its supervision.
 
@@ -152,6 +157,7 @@ fn run(arguments: Vec<OsString>) -> Result<Value, Exit> {
         ["journal", "head"] => journal(&layout, true),
         ["rebuild"] => rebuild(&layout, false),
         ["rebuild", "--check"] => rebuild(&layout, true),
+        ["flow"] => flow(&layout),
         ["mission", "new", options @ ..] => mission_new(&layout, options),
         ["hook", harness, rest @ ..] => {
             hook(&layout, harness, rest);
@@ -622,6 +628,24 @@ fn mission_new(layout: &Layout, words: &[&str]) -> Result<Value, Exit> {
             "max_output_bytes": number("--max-output")?,
         }),
     )
+}
+
+/// `ws flow`: the measures are printed whatever they hold; an accepted mission
+/// left out of them makes the exit code 3, so a caller cannot read a partial
+/// measure as a complete one.
+fn flow(layout: &Layout) -> Result<Value, Exit> {
+    let measures = request(layout, &json!({ "op": "flow.measures" }))?;
+    let unusable = measures
+        .get("unusable")
+        .and_then(Value::as_array)
+        .ok_or_else(|| refused("flow.response_invalid"))?;
+    if unusable.is_empty() {
+        return Ok(measures);
+    }
+    let text =
+        serde_json::to_string_pretty(&measures).map_err(|_| refused("flow.response_invalid"))?;
+    println!("{text}");
+    Err(Exit::Code(3))
 }
 
 fn journal(layout: &Layout, head_only: bool) -> Result<Value, Exit> {

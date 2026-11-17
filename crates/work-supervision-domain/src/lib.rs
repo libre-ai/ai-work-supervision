@@ -53,6 +53,7 @@
 //! ```
 
 pub mod coordination;
+pub mod flow;
 mod ids;
 mod model;
 pub mod outline;
