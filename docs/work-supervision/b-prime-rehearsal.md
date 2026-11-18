@@ -1,6 +1,6 @@
 # B′ rehearsal — SIMULATION with the fake agent
 
-> **Simulation.** B′, the v0 exit criterion of `project.v1.yaml`, is ten
+> **Simulation.** B′, a v0 exit criterion of `project.v1.yaml`, is ten
 > consecutive missions end to end with a **real** agent behind the C0
 > confinement qualification. This rehearsal runs the same campaign with the
 > fake agent. It exercises the v0 machinery and **does not count toward B′**;
