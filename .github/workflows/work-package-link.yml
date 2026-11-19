@@ -18,6 +18,6 @@ jobs:
     permissions:
       contents: read
       issues: read
-    uses: libre-ai/project-governance/.github/workflows/reusable-work-package-link.yml@75d6ea085b18cb15d450d7f0f5b1ba9d69645800
+    uses: libre-ai/project-governance/.github/workflows/reusable-work-package-link.yml@a00daec8d10419f266a9611f589c606858ca86b3
     with:
-      tooling_ref: 75d6ea085b18cb15d450d7f0f5b1ba9d69645800
+      tooling_ref: a00daec8d10419f266a9611f589c606858ca86b3
