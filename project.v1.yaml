@@ -39,6 +39,10 @@ phases:
         text: "Run 10 consecutive missions end to end in Work Supervision with a real agent, behind the C0 confinement qualification, without any handoff file in notes/; the journal verifier is green and no worktree is left orphaned after the tenth."
         weight: 1
         status: "pending"
+      - id: "verified-use"
+        text: "Verified use: the delivered v0 is played against its one-sentence use promise and each task is recorded as done alone, done with help or failed. This criterion is held by project-governance: verdicts and tester names stay outside this repository, and neither the mission state machine nor the event catalogue changes."
+        weight: 1
+        status: "pending"
   - id: "admission"
     title: "Bounded capability admission (v1 multi-tenant server)"
     note: "Recovered code is present. Documentary checks do not accept product qualification criteria."
