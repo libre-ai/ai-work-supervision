@@ -140,6 +140,11 @@ lectures : EUPL-1.2, I-11). **Ce qui change** : les exigences d'authentification
 (SPECIFICATION-STANDARD section 7), de données avec clé tenant et rétention (section 6) ne
 s'appliquent à la v1 qu'en lecture B. La décision est posée en Q1 de `questions-ouvertes.md`.
 
+**Critère `verified-use` (ajouté le 2026-11-19, lot L031)** : la fiche `project.v1.yaml` porte en
+phase `v0` un second critère, `verified-use`, à côté de `b-prime`. Il n'a d'objet qu'en lecture B ;
+en lecture A, B′ reste la seule preuve et ce critère est à retirer. Son ajout ne tranche pas E3
+(décision du propriétaire du 2026-11-19).
+
 ## 10. Devenir du projet
 
 **Recommandation : conserver**, avec scission du code récupéré gelé (`apps/missions`,
