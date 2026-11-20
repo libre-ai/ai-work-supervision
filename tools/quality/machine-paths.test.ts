@@ -51,7 +51,7 @@ describe("machinePathRemaps", () => {
   });
 
   test("targets do not depend on the machine", () => {
-    const other = machinePathContext("/elsewhere/clone-b", {}, "/home/someone");
+    const other = machinePathContext("/elsewhere/clone-b", {}, "/home/someone"); // allow-local-path (fixture)
     expect(machinePathRemaps(other).map(({ to }) => to)).toEqual(
       machinePathRemaps(context).map(({ to }) => to),
     );
