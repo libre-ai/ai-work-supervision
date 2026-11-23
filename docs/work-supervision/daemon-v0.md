@@ -14,7 +14,9 @@ an existing path or a path inside a git working tree is refused
 `config.toml` is private and lives only in the root; it is read with a strict
 TOML subset (`crates/work-supervision-daemon/src/config.rs`). A profile other
 than `fake` stops the daemon before anything else
-(`agent.real_forbidden_until_c0`).
+(`agent.real_forbidden_until_c0`). Its `[forge]` and `[forge.senders]`
+sections — the mode of forge signals and the senders admitted — are described
+in `coordination-v0.md`, « Forge signals »; absent, every signal is ignored.
 
 ## Daemon
 

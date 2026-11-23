@@ -348,6 +348,74 @@ fn refusal(root: &Path, args: &[&str]) -> String {
     String::from_utf8(output.stderr).unwrap().trim().to_owned()
 }
 
+/// Every file under `directory` with its length, recursively.
+fn tree(directory: &Path) -> Vec<(PathBuf, u64)> {
+    let mut found = Vec::new();
+    for entry in fs::read_dir(directory).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            found.extend(tree(&path));
+        } else {
+            let length = fs::metadata(&path).unwrap().len();
+            found.push((path, length));
+        }
+    }
+    found.sort();
+    found
+}
+
+#[test]
+fn a_forge_input_of_unknown_form_is_refused_before_the_daemon_and_writes_nothing() {
+    // No daemon runs: a refusal here comes from `ws` itself, before any
+    // request is sent.
+    let setup = setup();
+    let before = tree(&setup.root);
+    let review = serde_json::json!({
+        "id": 11, "state": "CHANGES_REQUESTED", "body": "x", "user": { "login": "a" },
+        "commit_id": "0123456789abcdef0123456789abcdef01234567",
+        "pull_request_url": "https://api.github.com/repos/libre-ai/sample/pulls/12",
+    });
+    let mut merged = review.clone();
+    merged["state"] = serde_json::json!("MERGED");
+    for (input, code) in [
+        ("{\"message\":\"Not Found\"}", "forge.input_unknown"),
+        ("[{\"id\":1,\"body\":\"a comment\"}]", "forge.input_unknown"),
+        ("not json at all", "forge.input_unknown"),
+        ("", "forge.input_unknown"),
+        (&format!("[{merged}]"), "forge.input_invalid"),
+        (
+            "{\"total_count\":2,\"check_runs\":[]}",
+            "forge.input_incomplete",
+        ),
+    ] {
+        let output = ws_input(
+            &setup.root,
+            &["forge", "ingest", "00000000000000000000000000000001"],
+            input,
+        );
+        assert_eq!(output.status.code(), Some(1), "{input}");
+        assert_eq!(
+            String::from_utf8_lossy(&output.stderr).trim(),
+            format!("ws: {code}"),
+            "{input}"
+        );
+        assert!(output.stdout.is_empty());
+    }
+    assert_eq!(tree(&setup.root), before);
+    // A well-formed input goes as far as the socket.
+    let output = ws_input(
+        &setup.root,
+        &["forge", "ingest", "00000000000000000000000000000001"],
+        &format!("[{review}]"),
+    );
+    assert!(String::from_utf8_lossy(&output.stderr).contains("transport.connect"));
+    let output = ws(
+        &setup.root,
+        &["mission", "link-forge", "x", "libre-ai/sample", "twelve"],
+    );
+    assert_eq!(output.status.code(), Some(2));
+}
+
 #[test]
 fn ideas_decisions_sessions_and_contracts_through_the_command_line() {
     let setup = setup();

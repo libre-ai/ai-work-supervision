@@ -1,7 +1,8 @@
 # Work Supervision v0 — coordination primitives
 
-Crates: `crates/work-supervision-domain` (pure rules, modules `coordination`
-and `scope`), `crates/work-supervision-store` (migration 0004, projection),
+Crates: `crates/work-supervision-domain` (pure rules, modules `coordination`,
+`scope` and `forge`), `crates/work-supervision-store` (migrations 0004 and
+0007, projection),
 `crates/work-supervision-daemon` (operations and guards),
 `crates/work-supervision-cli` (`ws` commands, `ws report`, `ws hook`) and
 `crates/work-supervision-cockpit` (read and decide).
@@ -31,6 +32,7 @@ declaration.
 | withdraw a decision request | yes | only one it opened |
 | declare dependency, scope, check | yes | refused `actor.owner_only` |
 | split an approved outline into missions | yes | refused `actor.owner_only` |
+| link a pull request, ingest forge signals | yes | refused `actor.owner_only` |
 | run checks, decide on a mission | yes (unchanged) | not exposed to sessions |
 | register, report, end a session | — | its own session |
 
@@ -340,6 +342,100 @@ wiring is in `harness-adapters-v0.md`. The open decision requests of every
 mission are listed by the operation `decisions.pending` (`ws request list
 --open`), so a supervisor asks one question to know what waits for the owner.
 
+## Forge signals — a pull request's reviews and checks, as references
+
+A mission's result usually reaches the forge as a pull request, whose reviews
+and check runs say whether more work is needed. Work Supervision receives
+them **without opening any connection and without holding any forge
+secret**: the owner reads the forge with their own `gh` and passes its answer
+on standard input, as `ws hook` does for a harness. This is the one input of
+third-party origin v0 admits; it amends ADR-0042 §5 in
+`libre-ai/project-governance` (ADR-0073, carried by its own pull request
+there). The input is exactly as authentic as the owner's `gh`: `ws` does not
+authenticate the sender itself.
+
+- `ws mission link-forge <id> <owner/name> <pull>` (owner only) records
+  `mission.forge-linked`. A mission may be linked to several pull requests
+  (at most 32); linking the same pull request again is **refused**
+  (`forge.already_linked`), not ignored. A link is no transition: a terminal
+  mission can be linked — its result is what the pull request carries — and
+  stays terminal. The repository is kept in lowercase, as the forge compares
+  it.
+- `ws forge ingest <id>` (owner only) reads the output of
+  `gh api repos/<o>/<r>/pulls/<n>/reviews` (an array of reviews) or of
+  `gh api repos/<o>/<r>/commits/<sha>/check-runs` (an object with
+  `total_count` and `check_runs`). The form is detected; any other form is
+  refused **before the daemon is reached** (`forge.input_unknown`, exit 1,
+  nothing sent, nothing journalled). An element missing a field, holding a
+  state outside the closed vocabulary, or a URL outside
+  `https://api.github.com/repos/` refuses the whole input
+  (`forge.input_invalid`), as does a page of check runs smaller than its
+  `total_count` (`forge.input_incomplete`: a later page would be missing).
+- **References only.** Of each element `ws` keeps its source (`review` or
+  `check`), the forge's identifier, its state in the closed vocabulary below,
+  the commit, the repository and the pull requests it concerns. The body of a
+  review, the name and output of a check run, and every other text written on
+  the forge are dropped by the parser in `ws` itself, so they do not even
+  cross the socket; none can reach the journal, a blob or a brief (I-32).
+- **Routing.** Every signal must concern a pull request linked to the
+  mission (for a check run: one of the pull requests of its repository whose
+  head it ran on); otherwise the whole ingestion is refused
+  (`forge.not_linked`) and nothing is recorded.
+- **Senders.** The sender of a review is its author's login; that of a check
+  run is its application, `<slug>[bot]`. It is compared with the owner's list
+  in the private configuration (`config.toml`, never in a repository, I-21):
+
+  ```toml
+  [forge.senders]
+  lead = "login-1"              # entry name = forge login
+  ci = "github-actions[bot]"
+  ```
+
+  The login **never enters the journal**, neither in clear nor as a digest: a
+  login is a short public name, so a digest of it anyone can recompute is the
+  login itself (I-22). An admitted signal records the **entry name** the
+  owner chose (`sender`); an entry named as its own login is refused at
+  configuration. A sender outside the list is recorded
+  `forge.signal.ignored` with its reference and a closed `reason` only —
+  `sender_not_listed`, or `no_sender_listed` when the list is absent or
+  empty, which ignores everything — and has no other effect.
+- **Triggers.** A signal calls for follow-up work when it is a review in
+  `changes_requested`, or a check run in `failure` or `timed_out` (constant
+  `TRIGGERS` in `crates/work-supervision-domain/src/forge.rs`; widening it is
+  a reviewed change). Any other admitted signal is recorded
+  `forge.signal.observed`, without effect.
+- **Modes** (`[forge] mode`). `observe`, the default, records a triggering
+  signal `forge.signal.would-accept` with the complete proposal — the mission
+  `active` would create — in a blob, and creates nothing. `active` records
+  `forge.signal.accepted`, then creates that mission: a **draft** in the
+  original's repository, depending on the original, titled
+  `Follow-up of <owner/name>#<pull>`, whose brief is the fixed template
+  `FOLLOW_UP_BRIEF` followed by the reference (original mission, repository,
+  pull request, source and identifier, state, commit). It has no criterion
+  and the default budgets; only the owner refines and readies it. No signal
+  ever moves the original: a terminal mission is never reopened, the
+  follow-up is a new mission.
+- **Duplicates.** A signal already recorded under the same outcome (same
+  repository, source, identifier and state) is counted as a duplicate and
+  skipped, so ingesting the same output twice creates one follow-up. The same
+  signal observed in `observe` mode is accepted once after the owner switches
+  to `active`.
+- **Crash.** The accepted signal names the follow-up's identifier before the
+  mission is created; a restart (or `ws doctor`) creates a missing follow-up
+  and declares its missing dependency, counted as
+  `forge_follow_ups_completed` (`forge_follow_ups_failed` when it cannot).
+
+Vocabulary: `approved`, `changes_requested`, `commented`, `dismissed` (reviews);
+`success`, `failure`, `neutral`, `cancelled`, `skipped`, `timed_out`,
+`action_required`, `stale` (completed check runs); `pending` (a review not
+submitted, a check run not completed).
+
+The brief behind this section named the events `mission.forge_linked`,
+`forge.signal.ignored` and a `would_accept` record. The journal's kind
+grammar admits no underscore, so they are spelled `mission.forge-linked` and
+`forge.signal.would-accept`; `forge.signal.observed` and
+`forge.signal.accepted` complete the outcomes.
+
 ## Report
 
 `ws report <id> [--markdown]` builds, read-only, a report that stands on its
@@ -389,6 +485,11 @@ characters; an event that does not follow from the projected state is refused
 | `outline.split.intent` | `mission`, `artifact`, `plan_digest` (blob: the plan), `missions` (array of the identifiers to create, in plan order) |
 | `outline.split.confirmed` | `mission`, `artifact` |
 | `outline.split.aborted` | `mission`, `artifact` |
+| `mission.forge-linked` | `mission`, `repository` (lowercase `owner/name`), `pull` |
+| `forge.signal.ignored` | `mission`, `repository`, `pull` (the linked one it concerns), `source` (`review`, `check`), `signal` (the forge's identifier), `commit`, `reason` (`sender_not_listed`, `no_sender_listed`) |
+| `forge.signal.observed` | `mission`, `repository`, `pull`, `source`, `signal`, `commit`, `state`, `sender` (entry name of `[forge.senders]`) |
+| `forge.signal.would-accept` | as `forge.signal.observed`, and `proposal_digest` (blob: the proposed mission, JSON) |
+| `forge.signal.accepted` | as `forge.signal.would-accept`, and `follow_up` (the mission it creates, recorded before it exists) |
 
 Projected by migration 0004 in tables `ideas`, `requests`, `request_options`,
 `mission_dependencies`, `mission_scopes`, `scope_checks`, `criterion_checks`,
@@ -404,3 +505,11 @@ exist). The projection refuses an intent on an artifact that is not the
 approved outline of its mission, naming an existing mission, or whose
 identifiers do not match its plan, and a confirmation while a planned mission
 is missing.
+
+Migration 0007 adds the tables `forge_links` and `forge_signals`. The
+projection refuses a link of a pull request already linked or of a missing
+mission, and a signal on a pull request not linked to its mission, whose state
+is not one of its source or does not fit its outcome (a triggering state is
+never merely observed, a non-triggering one never proposed), an ignored signal
+naming a state or a sender, an admitted one carrying a reason or a sender that
+is not an entry name, and an accepted signal whose follow-up already exists.
