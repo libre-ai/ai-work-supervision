@@ -209,12 +209,18 @@ tests est `two-way` (un retrait de test se défait par une PR) ; le paquet qui a
 d'exécuteur réel est `one-way`, car il lève le refus de tout agent réel avant C0 et ses effets
 hors confinement ne se défont pas, et il ajoute une dépendance et change la fiche publiée. Les
 paquets portant CA-15, CA-11 et CA-19 dépendent de C0 et de `execution-sandbox` (§ 10) ; le paquet
-de CA-19 précède celui de CA-15 et CA-11. Les deux derniers paquets de la table ne découpent pas un
+de CA-19 précède celui de CA-15 et CA-11. Les trois derniers paquets de la table ne découpent pas un
 critère déclaré non satisfait. `WP-11` porte CA-20, critère ajouté au cahier avec le changement qui
 le tient : il n'ajoute que de la spécification et un test de structure, sans changement
 d'exécution, et son périmètre nomme aussi ce document et le cahier, que ce même changement modifie.
 `WP-12` porte CA-21, ajouté au cahier avec lui (mesures de flux des missions acceptées,
 `docs/work-supervision/flow-v0.md`) ; lecture seule, il est `two-way`.
+`WP-13` porte CA-22 (signaux de forge routés vers la mission, ADR-0073 de
+`libre-ai/project-governance`). Il est inscrit avant le changement qui le tient : son périmètre
+nomme aussi les fichiers que ce changement crée, qui ne sont pas encore suivis. Il est `one-way` :
+la migration 0007 et les sortes d'événements `mission.forge-linked` et `forge.signal.*` restent
+dans le journal de toute instance qui en a écrit, et un retour arrière laisserait un journal que le
+code antérieur refuse.
 
 | WP | CA-n couverts | Périmètre (chemins, globs) | Vérification (commande) | Porte anticipée |
 | --- | --- | --- | --- | --- |
@@ -230,3 +236,4 @@ d'exécution, et son périmètre nomme aussi ce document et le cahier, que ce m�
 | `WP-10` | `CA-15`, `CA-11` | `Cargo.toml`, `Cargo.lock`, `deny.toml`, `crates/work-supervision-domain/src/model.rs`, `project.v1.yaml` | `bun run check:native` | `one-way` |
 | `WP-11` | `CA-20` | `docs/work-supervision/harness-adapters-v0.md`, `docs/work-supervision/steering-surfaces-v0.md`, `crates/work-supervision-cli/tests/harness_adapters_spec.rs`, `docs/prd.md`, `docs/cahier-des-charges.md` | `cargo test -p work-supervision-cli --locked --test harness_adapters_spec` | `two-way` |
 | `WP-12` | `CA-21` | `crates/work-supervision-domain/src/flow.rs`, `crates/work-supervision-domain/tests/flow.rs`, `crates/work-supervision-store/src/flow.rs`, `crates/work-supervision-store/tests/flow.rs`, `crates/work-supervision-daemon/src/flow.rs`, `crates/work-supervision-daemon/tests/flow.rs`, `crates/work-supervision-cli/tests/flow.rs`, `docs/work-supervision/flow-v0.md`, `crates/work-supervision-domain/src/lib.rs`, `crates/work-supervision-store/src/lib.rs`, `crates/work-supervision-daemon/src/lib.rs`, `crates/work-supervision-daemon/src/core.rs`, `crates/work-supervision-cli/src/main.rs` | `cargo test -p work-supervision-domain -p work-supervision-store -p work-supervision-daemon -p work-supervision-cli --locked` | `two-way` |
+| `WP-13` | `CA-22` | `crates/work-supervision-cli/src/main.rs`, `crates/work-supervision-cli/tests/cli.rs`, `crates/work-supervision-daemon/src/config.rs`, `crates/work-supervision-daemon/src/coordination.rs`, `crates/work-supervision-daemon/src/core.rs`, `crates/work-supervision-daemon/src/forge.rs`, `crates/work-supervision-daemon/src/forge/tests.rs`, `crates/work-supervision-daemon/src/lib.rs`, `crates/work-supervision-domain/src/coordination.rs`, `crates/work-supervision-domain/src/forge.rs`, `crates/work-supervision-domain/src/lib.rs`, `crates/work-supervision-domain/tests/forge.rs`, `crates/work-supervision-store/migrations/postgres/0007_forge.sql`, `crates/work-supervision-store/migrations/schema.v0.json`, `crates/work-supervision-store/migrations/sqlite/0007_forge.sql`, `crates/work-supervision-store/src/forge.rs`, `crates/work-supervision-store/src/lib.rs`, `crates/work-supervision-store/src/projection.rs`, `crates/work-supervision-store/src/schema.rs`, `crates/work-supervision-store/tests/forge.rs`, `docs/work-supervision/coordination-v0.md`, `docs/work-supervision/daemon-v0.md`, `docs/work-supervision/events-v0.md` | `cargo test -p work-supervision-domain -p work-supervision-store -p work-supervision-daemon -p work-supervision-cli --locked` | `one-way` |
