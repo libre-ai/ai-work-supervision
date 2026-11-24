@@ -1,6 +1,6 @@
 # ai-work-supervision — PRD
 
-Maturité du document : proposition
+Maturité du document : décision
 
 Maturité : prototype
 
@@ -15,7 +15,8 @@ correction s'y ajoute : le rattachement de P15 à `libre-ai/signalement` (ADR-00
 désignent l'analyse de mission et ne sont pas dans ce dépôt.
 
 Portée du niveau : « prototype » qualifie le projet observé (cœur v0 exécuté au faux agent, B′
-`pending`) ; ce document est une proposition. La fiche porte `maturity: idea`
+`pending`) ; ce document est approuvé par le propriétaire le 2026-11-24 (niveau `décision`), ce qui
+approuve tous ses paquets de travail. La fiche porte `maturity: idea`
 (`project.v1.yaml:27`) : autre échelle, écart consigné (`cahier-des-charges.md` en-tête).
 
 Projet : `libre-ai/ai-work-supervision`, lu au SHA `582f21e1a314c412b6cc856cbfe22736d2419889`
