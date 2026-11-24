@@ -959,6 +959,7 @@ pub(crate) fn mission_extras(core: &Core, mission: &Mission) -> Result<Value, Fa
         "requests": store.requests_of(mission.id().as_str())?.iter().map(request_json).collect::<Vec<_>>(),
         "phases": crate::phases::mission_phases_json(core, mission)?,
         "outline": crate::outline::mission_json(core, mission)?,
+        "forge": crate::forge::mission_json(core, mission)?,
         "blockers": blocker_codes(core, mission)?,
         "checks_running": core.checks.contains_key(mission.id().as_str()),
     }))
@@ -1221,6 +1222,7 @@ pub(crate) fn recover(core: &mut Core, recovered: &mut Recovered) -> Result<(), 
             .idea(&id, &command, &Actor::Owner, clock::now()?)?;
     }
     crate::outline::recover(core, recovered)?;
+    crate::forge::recover(core, recovered)?;
     for mission in core.supervisor.missions()? {
         let Some(result) = mission.result() else {
             continue;

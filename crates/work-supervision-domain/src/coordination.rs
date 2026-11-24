@@ -100,6 +100,10 @@ pub enum CoordinationRefusal {
     OutlineKeyDuplicate,
     /// A slice waits for a key the plan does not hold.
     OutlineDependencyUnknown,
+    /// The pull request is linked to the mission already.
+    ForgeAlreadyLinked,
+    /// The pull request a forge signal concerns is not linked to the mission.
+    ForgeNotLinked,
 }
 
 impl CoordinationRefusal {
@@ -139,6 +143,8 @@ impl CoordinationRefusal {
             Self::OutlineKeyInvalid => "outline.key_invalid",
             Self::OutlineKeyDuplicate => "outline.key_duplicate",
             Self::OutlineDependencyUnknown => "outline.dependency_unknown",
+            Self::ForgeAlreadyLinked => "forge.already_linked",
+            Self::ForgeNotLinked => "forge.not_linked",
         }
     }
 }
@@ -280,6 +286,8 @@ macro_rules! named_enum {
         }
     };
 }
+
+pub(crate) use named_enum;
 
 named_enum!(
     /// Agent harness a declared session runs in. A harness is not an executor

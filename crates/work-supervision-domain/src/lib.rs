@@ -54,6 +54,7 @@
 
 pub mod coordination;
 pub mod flow;
+pub mod forge;
 mod ids;
 mod model;
 pub mod outline;
