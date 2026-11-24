@@ -7,6 +7,10 @@
 //! `serde_jcs`; it only reads bytes, so it can check a journal outside the
 //! SQLite projection and outside the process that wrote it.
 //!
+//! [`verify`] checks the chain and the shape of each line: it re-reads the
+//! writer's account. [`verify_expected`] also compares the journal with an
+//! expectation computed from artefacts the caller holds outside it.
+//!
 //! ```
 //! use work_supervision_journal_verifier::{Outcome, verify};
 //!
@@ -19,6 +23,11 @@
 //! ```
 
 pub mod canonical;
+pub mod expected;
+
+pub use expected::{
+    Comparison, Divergence, Expectation, ExpectationError, ExpectedOutcome, Gap, verify_expected,
+};
 
 use std::io::{self, BufRead as _, BufReader, Read};
 

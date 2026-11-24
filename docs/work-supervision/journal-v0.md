@@ -92,6 +92,91 @@ cargo run --locked -p work-supervision-journal-verifier -- <journal-file>
 
 Output names codes, line numbers and counts only; it never echoes journal content.
 
+## Expected state
+
+The checks above re-read the writer's account: they show the file is
+internally consistent, and compare it with nothing else. The expected-state
+check takes a second input, an **expectation**, built by the caller from
+artefacts it holds outside the journal, computes from it what the journal must
+contain, and names every gap. Library entry: `verify_expected` (the signature
+of `verify` is unchanged).
+
+```sh
+cargo run --locked -p work-supervision-journal-verifier -- <journal-file> --expected <expected-state-file>
+```
+
+The expectation is JSON, read strictly (an unknown or missing key refuses it):
+
+```json
+{ "schema": "libre-ai.work-supervision.expected-state.v0",
+  "missions": [
+    { "mission": "<32 hex>", "commit": "<40 or 64 hex>", "evidence_digest": "<64 hex>",
+      "checks": [ { "criterion": 0, "argv": ["cargo", "test"] } ] } ] }
+```
+
+| Artefact | Where the caller takes it from | What the journal must hold |
+| --- | --- | --- |
+| `commit` | the repository: `git rev-parse ws/<mission>` (`worktree-v0.md`) | the last `mission.result-submitted` of the mission names it |
+| `evidence_digest` | the evidence file the owner submitted: `shasum -a 256 <file>` | the same entry names it |
+| `checks[].argv` | the argument vector the owner declared (`ws` command line, mission plan) | a `check.declared` for that criterion whose `argv_digest` is the SHA-256 of the compact JSON array, computed by the verifier from the vector |
+
+The verifier never reads these values back from the journal, the projection or
+the blob store. Seven comparisons are planned per mission and two more per
+expected check:
+
+| Comparison | Gap code |
+| --- | --- |
+| a `mission.result-submitted` entry exists | `result-missing` |
+| its `commit` is the expected one | `commit-mismatch` |
+| its `evidence_digest` is the expected one | `evidence-mismatch` |
+| each expected check is declared, with the computed `argv_digest` | `check-undeclared`, `check-argv-mismatch` |
+| each expected check has a finished execution (`check.started` then `check.finished`) at the expected commit, with the computed `argv_digest`, and the **last** one exited 0 without signal nor overrun budget | `check-not-executed`, `check-not-passed` |
+| the journal declares no check on a criterion the expectation does not list | `check-unexpected` |
+| when the journal holds `mission.accepted`: every expected check had passed **before** that entry, and at least one check is expected | `accepted-without-passed-check` |
+
+The chain is verified first; a refused or torn journal is reported as above
+and nothing is compared. Without a submitted result, the commit and evidence
+comparisons are **not applicable**; so is the acceptance comparison of a
+mission the journal does not accept. They are counted, never dropped.
+
+| Exit | Meaning | Output |
+| --- | --- | --- |
+| 0 | chain valid, no gap | stdout, four lines: `consistent: <n> entries verified; head …`, then the counts below |
+| 4 | chain valid, at least one gap | stderr: `diverged: …`, the same counts, then one `gap: <code> mission <id> [criterion <c>] [line <l>]` per gap |
+| 2 | the expectation cannot be read (`unreadable: the expected-state file could not be read`) or is refused (`expectation-refused: <code>`) | stderr; nothing is compared |
+| 1, 3 | as without `--expected` | |
+
+An expectation listing no mission is refused (`expectation-empty`): it is
+never a pass on nothing. The counts printed on both verdicts sum:
+
+```
+missions: <e> expected = <f> found + <m> missing; <s> submitted in the journal = <f> covered + <o> outside the expectation
+comparisons: <p> planned = <a> matched + <d> diverged + <n> not applicable
+planned: <e> results + <e> commits + <e> evidence digests + <c> check declarations + <c> check executions + <e> undeclared-check sweeps + <e> acceptances
+```
+
+A mission submitted in the journal and absent from the expectation is counted
+(`outside the expectation`) and not compared. The output names the mission
+identifiers the expectation supplied, never a value read from the journal.
+
+What this check does **not** prove:
+
+- **who wrote the file.** There is no signature. A party able to rewrite the
+  journal can write one that agrees with the expectation; the check binds the
+  journal to the artefacts, not to an author.
+- that a check **really ran**. `check.finished` is the daemon's own record of
+  an exit code; the verifier re-runs nothing. It shows that the journal claims
+  a passed execution of the expected vector at the expected commit.
+- more than the caller's independence. An expectation copied from the journal
+  or from the projection compares the journal with itself.
+- the acceptance rules it does not list: phases, scope, red at the base,
+  dependencies and requests (`coordination-v0.md`, « Guards ») are not compared.
+
+The acceptance comparison is stricter than the daemon's guard on one point:
+the guard lets a mission **without any declared check** be accepted
+(`criteria.unverified` only concerns criteria carrying a check); here such an
+acceptance is the gap `accepted-without-passed-check`.
+
 ## Worked example
 
 The genesis entry below, without its `digest` key, is
@@ -110,4 +195,6 @@ implementations) is
 - The chain detects a modified, removed, inserted or reordered entry. It does not
   detect a consistent rewrite of the whole file on its own; the head anchored
   outside the root does (`daemon-v0.md`, « Head anchoring »).
+- Neither the chain nor the expected-state check says who wrote the file: the
+  journal is not signed (« Expected state », what it does not prove).
 - Opening verifies the whole file: the cost is linear in the journal size.
