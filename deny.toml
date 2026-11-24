@@ -21,6 +21,9 @@ all-features = true
 
 [advisories]
 yanked = "deny"
+# Explicit so that the verdict does not follow the tool default, which changes
+# from `all` to `workspace` in cargo-deny 0.22.0.
+unmaintained = "all"
 
 [licenses]
 confidence-threshold = 0.9
