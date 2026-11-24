@@ -65,6 +65,8 @@ pub(crate) struct Recovered {
     pub(crate) scope_check_failures: u64,
     pub(crate) outline_splits_confirmed: u64,
     pub(crate) outline_splits_aborted: u64,
+    pub(crate) forge_follow_ups_completed: u64,
+    pub(crate) forge_follow_ups_failed: u64,
 }
 
 pub(crate) fn lock(shared: &Shared) -> Result<MutexGuard<'_, Core>, Failure> {
@@ -366,6 +368,7 @@ pub(crate) fn handle(shared: &Shared, request: &Value) -> Result<Value, Failure>
         }
         op if crate::coordination::handles(op) => crate::coordination::handle(shared, op, request),
         op if crate::phases::handles(op) => crate::phases::handle(shared, op, request),
+        op if crate::forge::handles(op) => crate::forge::handle(shared, op, request),
         op if crate::flow::handles(op) => crate::flow::handle(shared, op, request),
         _ => Err(Failure::new("request.unknown_op")),
     }
@@ -388,6 +391,8 @@ pub(crate) fn report_json(recovered: &Recovered) -> Value {
         "scope_checks_failed": recovered.scope_check_failures,
         "outline_splits_confirmed": recovered.outline_splits_confirmed,
         "outline_splits_aborted": recovered.outline_splits_aborted,
+        "forge_follow_ups_completed": recovered.forge_follow_ups_completed,
+        "forge_follow_ups_failed": recovered.forge_follow_ups_failed,
     })
 }
 
