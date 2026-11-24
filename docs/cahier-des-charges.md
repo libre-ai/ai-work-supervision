@@ -268,7 +268,7 @@ elles sont marquées comme telles.
   (`cockpit-v0.md:9, 37`). Cadres : NIS2 (réduction de surface) ; RGS / SecNumCloud ne
   s'appliquent pas à un outil local v0 et s'appliqueraient à un service hébergé (hors périmètre).
 - ENF-7 **Reproductibilité de la chaîne d'outils** : versions exactes (`Cargo.toml:27-39`),
-  toolchain `1.97.0` (`rust-toolchain.toml`), cargo-deny par archive hachée
+  toolchain `1.100.0` (`rust-toolchain.toml`), cargo-deny par archive hachée
   (`tools/quality/check-dependency-policy.ts:37-40`), garde d'âge de publication de 3 jours
   (`.github/dependabot.yml`, commentaire « Release-age guard »). Cadres : NIS2 et DORA (chaîne
   d'approvisionnement, hypothèse).
