@@ -418,8 +418,8 @@ La colonne « Déclaré / importé » distingue la déclaration (`overrides` de 
 
 ### 11.2 Externes
 
-- Rust : `rusqlite` 0.40.2 (bundled), `portable-pty` 0.9.0, `vt100` 0.16.2, `ratatui` 0.30.2,
-  `nix` 0.28.0, `rustix` 1.1.5, `tiny_http` 0.12.0, `serde_jcs` 0.2.0, `sha2` 0.11.0
+- Rust : `rusqlite` 0.41.1 (bundled), `portable-pty` 0.9.0, `vt100` 0.16.2, `ratatui` 0.30.2,
+  `nix` 0.28.0, `rustix` 1.1.6, `tiny_http` 0.12.0, `serde_jcs` 0.2.0, `sha2` 0.11.0
   (`Cargo.toml:27-39`) ; toutes dans la liste `allow` de `deny.toml`.
 - Système : `git` installé, appelé en processus séparé (ADR-0042 §10) ; `/bin/sh` comme `SHELL`
   du PTY (`pty-v0.md:12-14`).
