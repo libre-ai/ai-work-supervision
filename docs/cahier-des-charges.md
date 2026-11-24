@@ -53,8 +53,8 @@ Trois générations de code coexistent dans un même arbre (fiche d'inventaire,
    `packages/auth-web/G2-I01-QUALIFICATION.md:5-7`). Provenance par fichier dans
    `docs/code-recovery-provenance.json` (schéma `code-recovery.v1`).
 3. **Les adaptateurs** : `adapters/pi/ws-bridge.ts` (extension Pi du pont déclaratif,
-   `harness-adapters-v0.md:102-110`) et l'outillage de qualité `tools/quality/` (cargo-deny
-   épinglé, chemins machine).
+   `harness-adapters-v0.md:102-110`) et l'outillage de qualité `tools/quality/` (chemins
+   machine ; cargo-deny est épinglé par l'autorité, `libre-ai/project-governance`).
 
 ### 1.2 Activité et preuve
 
@@ -269,7 +269,8 @@ elles sont marquées comme telles.
   s'appliquent pas à un outil local v0 et s'appliqueraient à un service hébergé (hors périmètre).
 - ENF-7 **Reproductibilité de la chaîne d'outils** : versions exactes (`Cargo.toml:27-39`),
   toolchain `1.97.0` (`rust-toolchain.toml`), cargo-deny par archive hachée
-  (`tools/quality/check-dependency-policy.ts:37-40`), garde d'âge de publication de 3 jours
+  (`toolchains/cargo-deny.json` de `libre-ai/project-governance`, appelé par le script
+  `check:dependency-policy` de `package.json`), garde d'âge de publication de 3 jours
   (`.github/dependabot.yml`, commentaire « Release-age guard »). Cadres : NIS2 et DORA (chaîne
   d'approvisionnement, hypothèse).
 - ENF-8 **Coût machine borné** : budgets par run (durée, octets) avec `SIGTERM` puis `SIGKILL`
@@ -305,7 +306,7 @@ elles sont marquées comme telles.
 | DNS rebinding, CSRF, requête cross-site sur le cockpit | `Host` strict, `Origin` propre, `Sec-Fetch-Site`, cookie `HttpOnly` `SameSite=Strict`, jeton CSRF, comparaison en temps constant | `cockpit-v0.md:35-43` |
 | Agent évadant son worktree | **aucun contrôle d'évasion au SHA lu** : `pty.cwd_invalid` refuse un répertoire de travail manquant, l'environnement est vidé et le groupe de processus tué en fin de run, mais rien n'empêche une lecture ou une écriture ailleurs sur le disque ni l'accès au socket ; le confinement est C0, hors dépôt (même limite que les lignes « Processus du même UID » et « Agent réel » ci-dessous) | `pty-v0.md:9-28` ; `architecture.md` § 7.1 |
 | Hooks git ou configuration globale détournés | `core.hooksPath=/dev/null`, `GIT_CONFIG_GLOBAL=/dev/null`, `GIT_CONFIG_NOSYSTEM=1`, argv fixe sans shell | `worktree-v0.md:7-13` |
-| Dépendance sous licence non admise ou source inconnue | cargo-deny `bans`, `licenses`, `sources` depuis le check requis ; `allow-org github = ["libre-ai"]` | `deny.toml` ; `check-dependency-policy.ts:40` |
+| Dépendance sous licence non admise ou source inconnue | cargo-deny `bans`, `licenses`, `sources` depuis le check requis ; `allow-org github = ["libre-ai"]` | `deny.toml` ; script `check:dependency-policy` de `package.json` |
 | **Processus du même UID se déclarant `owner`** | **aucune** : « the actor is declarative, not authenticated » ; la frontière attendue est C0 | `coordination-v0.md:16-23` — question Q5 |
 | **Agent réel lançant des effets hors confinement** | refus de tout profil autre que `fake` jusqu'à C0 | `mission-v0.md:39-44` |
 
