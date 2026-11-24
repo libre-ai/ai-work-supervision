@@ -213,6 +213,14 @@ the end, its output in `runs/<check>/pty.log`. Events: `check.started`
 started by a dead daemon is recorded `check.interrupted` at start (crash point
 `check-started`), and an interrupted execution never passes.
 
+These events are the daemon's own account. `ws-journal-verify --expected`
+compares them with artefacts held outside the journal — the submitted commit,
+the evidence digest, the declared argument vectors — and names a declared
+check without a passed execution, or an acceptance that rests on none
+(`journal-v0.md`, « Expected state », with what that check does not prove). A
+mission without any declared check passes the acceptance guard above; that
+comparison names it.
+
 A check executes what the worktree contains with the user's rights, exactly as
 the owner running the same command by hand would; it is not confined until C0
 is. Only the owner declares and runs checks.
