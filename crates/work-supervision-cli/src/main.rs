@@ -42,6 +42,12 @@
 //! ws session list
 //! ws hook <harness> [<payload>]       (payload on standard input, or as the last argument)
 //!
+//! Forge signals (coordination-v0.md, « Forge signals »; owner only):
+//! ws mission link-forge <id> <owner/name> <pull>
+//! ws forge ingest <id>                (on standard input, the output of
+//!                                      gh api repos/<o>/<r>/pulls/<n>/reviews or
+//!                                      gh api repos/<o>/<r>/commits/<sha>/check-runs)
+//!
 //! Phases (docs/work-supervision/phases-v0.md):
 //! ws workflow <id> <phase>…
 //! ws artifact submit <id> <phase> <file> [--session <id>]
@@ -159,6 +165,7 @@ fn run(arguments: Vec<OsString>) -> Result<Value, Exit> {
         ["rebuild", "--check"] => rebuild(&layout, true),
         ["flow"] => flow(&layout),
         ["mission", "new", options @ ..] => mission_new(&layout, options),
+        ["forge", "ingest", id] => forge_ingest(&layout, id),
         ["hook", harness, rest @ ..] => {
             hook(&layout, harness, rest);
             Ok(Value::Null)
@@ -356,6 +363,10 @@ fn simple_request(words: &[&str]) -> Result<Value, Exit> {
         ["mission", "depend", id, "--on", on] => {
             json!({ "op": "mission.depend", "mission": id, "on": on })
         }
+        ["mission", "link-forge", id, repository, pull] => {
+            let pull: u64 = pull.parse().map_err(|_| Exit::Usage)?;
+            json!({ "op": "forge.link", "mission": id, "repository": repository, "pull": pull })
+        }
         ["check", id] => json!({ "op": "check.run", "mission": id }),
         [
             "idea",
@@ -383,6 +394,29 @@ fn simple_request(words: &[&str]) -> Result<Value, Exit> {
         ["artifact", "show", artifact] => json!({ "op": "artifact.show", "artifact": artifact }),
         _ => return Err(Exit::Usage),
     })
+}
+
+/// Largest forge output `ws forge ingest` reads from standard input.
+const MAX_FORGE_INPUT_BYTES: u64 = 16 << 20;
+
+/// `ws forge ingest <id>`: reads the output of `gh api` on standard input and
+/// sends its references only. The forge's texts are dropped here, before the
+/// daemon is even reached; a refused input sends nothing.
+fn forge_ingest(layout: &Layout, mission: &str) -> Result<Value, Exit> {
+    use std::io::Read as _;
+
+    let mut text = String::new();
+    std::io::stdin()
+        .take(MAX_FORGE_INPUT_BYTES + 1)
+        .read_to_string(&mut text)
+        .map_err(|_| refused("forge.input_unreadable"))?;
+    if u64::try_from(text.len()).map_or(true, |length| length > MAX_FORGE_INPUT_BYTES) {
+        return Err(refused("forge.input_invalid"));
+    }
+    let input: Value = serde_json::from_str(&text).map_err(|_| refused("forge.input_unknown"))?;
+    let message = work_supervision_daemon::ingest_request(mission, &input)
+        .map_err(|failure| refused(failure.code()))?;
+    request(layout, &message)
 }
 
 /// Adds `actor: session:<id>` when `--session` is given.

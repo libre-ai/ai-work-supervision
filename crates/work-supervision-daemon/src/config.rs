@@ -21,12 +21,23 @@
 //!
 //! [anchor]
 //! path = "/absolute/path/outside/the/root/anchors.v0"
+//!
+//! [forge]                                # coordination-v0.md, « Forge signals »
+//! mode = "observe"                       # or "active"; observe when absent
+//!
+//! [forge.senders]                        # who is admitted; nobody when absent
+//! lead = "login-1"                       # entry name (journalled) = forge login (never journalled)
+//! ci = "github-actions[bot]"
 //! ```
+//!
+//! An admitted signal records the entry name, never the login: the owner
+//! chooses a name that is not the login itself (refused when equal).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use work_supervision_domain::ExecutorProfile;
+use work_supervision_domain::forge::{AllowedSender, ForgeLogin, ForgeMode, SenderEntry};
 
 use crate::Failure;
 
@@ -40,6 +51,8 @@ pub struct Config {
     idle_after_ms: u64,
     grace_ms: u64,
     anchor: Option<PathBuf>,
+    forge_mode: ForgeMode,
+    forge_senders: Vec<AllowedSender>,
 }
 
 const DEFAULT_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
@@ -70,6 +83,8 @@ impl Config {
             idle_after_ms: 2_000,
             grace_ms: 2_000,
             anchor: None,
+            forge_mode: ForgeMode::Observe,
+            forge_senders: Vec::new(),
         };
         let invalid = Failure::new("config.invalid");
         let mut section = String::new();
@@ -82,7 +97,10 @@ impl Config {
                 .strip_prefix('[')
                 .and_then(|rest| rest.strip_suffix(']'))
             {
-                if !matches!(name, "repositories" | "executor" | "runs" | "anchor") {
+                if !matches!(
+                    name,
+                    "repositories" | "executor" | "runs" | "anchor" | "forge" | "forge.senders"
+                ) {
                     return Err(invalid);
                 }
                 name.clone_into(&mut section);
@@ -121,6 +139,20 @@ impl Config {
                         return Err(invalid);
                     }
                     config.anchor = Some(path);
+                }
+                ("forge", "mode", Value::Text(mode)) => {
+                    config.forge_mode = ForgeMode::parse(&mode).map_err(|_| invalid)?;
+                }
+                ("forge.senders", entry, Value::Text(login)) => {
+                    let allowed = sender(entry, &login).ok_or(invalid)?;
+                    let taken = config
+                        .forge_senders
+                        .iter()
+                        .any(|known| known.entry == allowed.entry || known.login == allowed.login);
+                    if taken {
+                        return Err(invalid);
+                    }
+                    config.forge_senders.push(allowed);
                 }
                 _ => return Err(invalid),
             }
@@ -189,6 +221,30 @@ impl Config {
     pub const fn grace_ms(&self) -> u64 {
         self.grace_ms
     }
+
+    /// What an admitted forge signal that triggers does (`observe` unless
+    /// configured `active`).
+    #[must_use]
+    pub const fn forge_mode(&self) -> ForgeMode {
+        self.forge_mode
+    }
+
+    /// The sender list: whose signals are admitted, under which entry name.
+    /// Empty unless configured: every signal is then ignored.
+    #[must_use]
+    pub fn forge_senders(&self) -> &[AllowedSender] {
+        &self.forge_senders
+    }
+}
+
+/// One `[forge.senders]` line: an entry name and the login it admits. An
+/// entry named as its login would journal the login, so it is refused.
+fn sender(entry: &str, login: &str) -> Option<AllowedSender> {
+    let allowed = AllowedSender {
+        entry: SenderEntry::parse(entry).ok()?,
+        login: ForgeLogin::parse(login).ok()?,
+    };
+    (allowed.entry.as_str() != allowed.login.as_str()).then_some(allowed)
 }
 
 enum Value {
@@ -237,6 +293,8 @@ fn is_name(name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use work_supervision_domain::forge::ForgeMode;
+
     use super::Config;
 
     #[test]
@@ -272,6 +330,48 @@ mod tests {
                 .code(),
             "config.repository_invalid"
         );
+        // Forge signals: observe and nobody admitted unless configured.
+        assert_eq!(config.forge_mode(), ForgeMode::Observe);
+        assert!(config.forge_senders().is_empty());
+        let forge = Config::parse(
+            "[forge]\nmode = \"active\"\n[forge.senders]\nlead = \"Reviewer-1\"\nci = \"github-actions[bot]\"\n",
+        )
+        .unwrap();
+        assert_eq!(forge.forge_mode(), ForgeMode::Active);
+        assert_eq!(
+            forge
+                .forge_senders()
+                .iter()
+                .map(|allowed| (allowed.entry.as_str(), allowed.login.as_str()))
+                .collect::<Vec<_>>(),
+            [("lead", "reviewer-1"), ("ci", "github-actions[bot]")]
+        );
+        assert!(
+            Config::parse("[forge.senders]\n")
+                .unwrap()
+                .forge_senders()
+                .is_empty()
+        );
+        for invalid in [
+            "[forge]\nmode = \"auto\"\n",
+            "[forge]\nmode = 1\n",
+            "[forge]\nsenders = \"reviewer-1\"\n",
+            "[forge]\nkey = \"x\"\n",
+            "[forge.senders]\nlead = \"two words\"\n",
+            "[forge.senders]\nLead = \"reviewer-1\"\n",
+            "[forge.senders]\nlead = 1\n",
+            // The same entry twice, the same login twice.
+            "[forge.senders]\nlead = \"a\"\nlead = \"b\"\n",
+            "[forge.senders]\nlead = \"a\"\nsecond = \"A\"\n",
+            // An entry named as its login would journal the login.
+            "[forge.senders]\nreviewer-1 = \"Reviewer-1\"\n",
+        ] {
+            assert_eq!(
+                Config::parse(invalid).unwrap_err().code(),
+                "config.invalid",
+                "{invalid:?}"
+            );
+        }
         for real in ["claude", "codex", "/usr/local/bin/claude"] {
             let text = format!("[executor]\nprofile = \"{real}\"\n");
             assert_eq!(

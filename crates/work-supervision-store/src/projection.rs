@@ -183,6 +183,10 @@ pub(crate) fn apply(
         kind if kind.starts_with("outline.split.") => {
             crate::outline::project(transaction, kind, &fields, blobs, seq_value, at)
         }
+        "mission.forge-linked" => crate::forge::link(transaction, &fields, seq_value, at),
+        kind if kind.starts_with("forge.signal.") => {
+            crate::forge::signal(transaction, kind, &fields, blobs, seq_value, at)
+        }
         kind if kind.starts_with("dependency.")
             || kind.starts_with("scope.")
             || kind.starts_with("check.") =>

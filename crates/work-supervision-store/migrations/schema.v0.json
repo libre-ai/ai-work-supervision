@@ -180,6 +180,38 @@
       "primary_key": ["mission_id", "criterion"]
     },
     {
+      "name": "forge_links",
+      "columns": [
+        { "name": "mission_id", "type": "text", "nullable": false },
+        { "name": "repository", "type": "text", "nullable": false },
+        { "name": "pull", "type": "integer", "nullable": false },
+        { "name": "seq", "type": "integer", "nullable": false },
+        { "name": "at", "type": "text", "nullable": false }
+      ],
+      "primary_key": ["mission_id", "repository", "pull"]
+    },
+    {
+      "name": "forge_signals",
+      "columns": [
+        { "name": "seq", "type": "integer", "nullable": false },
+        { "name": "mission_id", "type": "text", "nullable": false },
+        { "name": "repository", "type": "text", "nullable": false },
+        { "name": "pull", "type": "integer", "nullable": false },
+        { "name": "source", "type": "text", "nullable": false },
+        { "name": "signal_id", "type": "integer", "nullable": false },
+        { "name": "head_commit", "type": "text", "nullable": false },
+        { "name": "state", "type": "text", "nullable": true },
+        { "name": "sender", "type": "text", "nullable": true },
+        { "name": "reason", "type": "text", "nullable": true },
+        { "name": "outcome", "type": "text", "nullable": false },
+        { "name": "proposal", "type": "text", "nullable": true },
+        { "name": "proposal_digest", "type": "text", "nullable": true },
+        { "name": "follow_up", "type": "text", "nullable": true },
+        { "name": "at", "type": "text", "nullable": false }
+      ],
+      "primary_key": ["seq"]
+    },
+    {
       "name": "ideas",
       "columns": [
         {
